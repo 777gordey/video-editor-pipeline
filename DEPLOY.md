@@ -1,80 +1,53 @@
-# Деплой на боевой n8n (194.154.29.60)
+# Деплой на n8n — статус
 
-Этот пайплайн — НОВЫЙ, изолированный воркфлоу. Он не трогает существующие
-боевые воркфлоу (`med agent boss`, «Алина» и т.д.), но требует одного
-изменения на уровне контейнера n8n — добавления переменных окружения.
+Внутренние адреса/идентификаторы (домен сервера, имя бота, user_id, ссылка на
+воркфлоу) сюда намеренно не публикуются — репозиторий публичный. Держите их в
+приватной заметке.
 
-## Что нужно от владельца (не делается автоматически)
+## Сделано
 
-1. **GitHub PAT** с правами `repo` (классический токен, не fine-grained —
-   проще). Создать: https://github.com/settings/tokens → Generate new token
-   (classic) → scope `repo`. Не присылать в чат — вставить сразу в шаге 3.
-2. **Тестовое видео** до 5 минут — положить на VPS в `/root/video-pipeline/test/source.mp4`.
+- Контейнер `n8n` пересоздан с переменными окружения (`--env-file`, права 600
+  на файле): `TELEGRAM_BOT_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO`,
+  `ALLOWED_USER_ID`, плюс все прежние переменные, проброс порта `5678`, volume
+  `n8n_data`, memory limit 2 GiB.
+- `.github/workflows/edit-video.yml` и `scripts/process_video.py` запушены в
+  этот репозиторий.
+- Воркфлоу `n8n/video-pipeline-workflow.json` импортирован в n8n через CLI
+  (`docker exec n8n n8n import:workflow`) — **неактивен**, ждёт привязки
+  credentials.
+- Создан отдельный Telegram-бот специально под этот пайплайн.
 
-## Шаг 1 — переменные окружения контейнера n8n
+## Осталось сделать в UI n8n (вручную)
 
-Контейнер `n8n` НЕ управляется активным `docker-compose.yml` (создан вручную,
-см. память `project-n8n-vps`) — добавить переменные можно только пересозданием
-контейнера (`docker update` их не поддерживает). Это ~15 секунд простоя n8n
-(соответственно и бота Егора). Процедура (уже проверялась 31.08 при плановом
-пересоздании):
+1. Открыть импортированный воркфлоу в редакторе n8n.
+2. На нодах `Telegram Trigger`, `Reject`, `Notify timeout`, `Notify failure`,
+   `Send result` — выбрать/создать credential типа **Telegram API**, вставить
+   токен бота.
+3. На нодах `Trigger GitHub Action`, `Find run`, `List artifacts`, `Download
+   artifact zip` — создать credential типа **GitHub API** с PAT (repo-scope;
+   рекомендуется пересоздать как fine-grained token только на этот репозиторий
+   и отозвать исходный classic PAT).
+4. Сохранить и активировать воркфлоу (тумблер вверху справа).
 
-```bash
-# 1. Снять текущий конфиг для сверки
-docker inspect n8n > /root/n8n_inspect_before_video_pipeline.json
+## Тест (ЭТАП 5)
 
-# 2. Аккуратно остановить и удалить контейнер (данные в volume n8n_data, не теряются)
-docker stop n8n && docker rm n8n
+Отправить видео (до 5 минут) новому боту от аккаунта-владельца
+(`ALLOWED_USER_ID`). Зафиксировать здесь:
 
-# 3. Пересоздать с ТЕМИ ЖЕ параметрами + новыми переменными
-#    (image ID и сети — как в n8n_inspect_before_video_pipeline.json,
-#     см. проверенную процедуру в памяти project-n8n-vps)
-docker run -d --name n8n \
-  --network ai_stack_default \
-  --restart always \
-  -v n8n_data:/home/node/.n8n \
-  -e WEBHOOK_URL=https://gordey1-bot.duckdns.org \
-  -e N8N_HOST=gordey1-bot.duckdns.org \
-  -e N8N_SECURE_COOKIE=false \
-  -e TELEGRAM_BOT_TOKEN='<токен нового видео-бота>' \
-  -e GITHUB_OWNER='<ваш GitHub логин>' \
-  -e GITHUB_REPO='video-editor-pipeline' \
-  -e ALLOWED_USER_ID='<ваш Telegram user_id>' \
-  <IMAGE_ID из n8n_inspect_before_video_pipeline.json>
+- Сработал ли триггер n8n: ?
+- Создался ли run в GitHub Actions: ?
+- Время обработки: ?
+- Скачан ли артефакт и пришло ли видео в Telegram: ?
+- Что не получилось (если что-то не получилось): ?
 
-docker network connect bridge n8n
-docker update --memory=2048m n8n
-```
+## Известные ограничения (см. также README.md)
 
-**Это действие я НЕ выполняю сам без вашего явного подтверждения** — сервер
-боевой, простой хоть и короткий, но затрагивает реальный медицинский бот.
-Дайте отмашку — либо выполню сам по SSH, либо пришлю точные команды вам.
-
-## Шаг 2 — credentials в n8n UI
-
-При импорте `n8n/video-pipeline-workflow.json` (Import from File) n8n попросит
-привязать credentials — создать:
-
-- **Telegram API** (тип `telegramApi`) — токен нового бота.
-- **GitHub API** (тип `githubApi` или generic `httpHeaderAuth` с заголовком
-  `Authorization: Bearer <PAT>`) — тот же PAT из шага «Что нужно от владельца».
-
-Узлы `Reject`, `Notify timeout`, `Notify failure`, `Send result`, `Telegram
-Trigger` — привязать к Telegram-credential. Узлы `Trigger GitHub Action`,
-`Find run`, `List artifacts`, `Download artifact zip` — к GitHub-credential.
-
-## Шаг 3 — активация
-
-Активировать воркфлоу через UI (не через API — см. известные грабли с PUT
-`/api/v1/workflows/{id}` в памяти `project-n8n-vps`, они касаются
-редактирования уже активных воркфлоу; для НОВОГО воркфлоу это не проблема,
-но активация всё равно через UI — надёжнее и не требует создания API-ключа
-с широкими правами ради разового действия).
-
-## Шаг 4 — тест (ЭТАП 5)
-
-1. Положить `test/source.mp4` на VPS (или его отдаст владелец боту напрямую в Telegram — тогда шаг не нужен).
-2. Отправить видео новому боту от аккаунта с `ALLOWED_USER_ID`.
-3. Смотреть: сработал ли триггер → создался ли GitHub Actions run → сколько
-   заняла обработка → скачался ли артефакт → пришло ли видео обратно.
-4. Результат зафиксировать в этом файле или в чате — что сработало, что нет.
+- `edit-video.yml` использует модель `small` faster-whisper на CPU — для
+  5-минутного видео транскрипция может занять несколько минут; общий бюджет
+  поллинга в n8n — 10 минут, при превышении шлёт ошибку в Telegram.
+- Артефакт хранится в GitHub 1 день (`retention-days: 1`).
+- `video_url` (содержит путь Telegram File API) маскируется в логах Actions
+  (`::add-mask::`) и не логируется явно нигде в workflow — но репозиторий
+  публичный, так что теоретическая поверхность атаки не нулевая: любой шаг,
+  который случайно засветит `$VIDEO_URL` в логах, раскроет ссылку с токеном
+  бота. Проверено при написании: ни один шаг явно не печатает `$VIDEO_URL`.
