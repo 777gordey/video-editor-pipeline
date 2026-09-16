@@ -79,6 +79,14 @@
                 "type": "number",
                 "operation": "lte"
               }
+            },
+            {
+              "leftValue": "={{$json.message.video?.file_size}}",
+              "rightValue": 20971520,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
             }
           ],
           "combinator": "and"
@@ -97,7 +105,7 @@
     {
       "parameters": {
         "chatId": "={{$json.message.chat.id}}",
-        "text": "Принимаются только видео до 5 минут, отправленные владельцем.",
+        "text": "Принимаются только видео до 5 минут и до 20 МБ (ограничение Telegram Bot API на скачивание файлов), отправленные владельцем. Пришлите видео с более низким битрейтом/разрешением.",
         "additionalFields": {}
       },
       "id": "tg-reject",
