@@ -455,15 +455,21 @@
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
           "response": {
             "response": {
-              "responseFormat": "file"
+              "fullResponse": true,
+              "neverError": true
             }
           }
         }
       },
-      "id": "http-download-artifact",
-      "name": "Download artifact zip",
+      "id": "http-get-artifact-redirect",
+      "name": "Get artifact download URL",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -479,6 +485,28 @@
     },
     {
       "parameters": {
+        "method": "GET",
+        "url": "={{$json.headers.location}}",
+        "authentication": "none",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "http-download-artifact",
+      "name": "Download artifact zip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        -400
+      ]
+    },
+    {
+      "parameters": {
         "operation": "decompress",
         "fileName": "data"
       },
@@ -487,7 +515,7 @@
       "type": "n8n-nodes-base.compression",
       "typeVersion": 1.1,
       "position": [
-        2860,
+        3080,
         -400
       ]
     },
@@ -699,6 +727,17 @@
       ]
     },
     "List artifacts": {
+      "main": [
+        [
+          {
+            "node": "Get artifact download URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get artifact download URL": {
       "main": [
         [
           {
