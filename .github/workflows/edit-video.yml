@@ -25,7 +25,7 @@ jobs:
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install faster-whisper opencv-python-headless
+          pip install faster-whisper "opencv-python-headless<5"
 
       # video_url приходит из client_payload и может содержать секрет
       # (например Telegram File API токен) — никогда не печатаем/не логируем
