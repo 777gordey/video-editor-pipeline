@@ -2,4 +2,5 @@ videos/
 *.mp4
 *.mov
 .env
-n8n_inspect_before_video_pipeline.json
+.env.*
+n8n_inspect*.json

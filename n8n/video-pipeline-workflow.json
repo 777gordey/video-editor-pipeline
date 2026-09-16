@@ -4,27 +4,42 @@
   "nodes": [
     {
       "parameters": {
-        "updates": ["message"]
+        "updates": [
+          "message"
+        ]
       },
       "id": "tg-trigger",
       "name": "Telegram Trigger",
       "type": "n8n-nodes-base.telegramTrigger",
       "typeVersion": 1.1,
-      "position": [0, 0],
+      "position": [
+        0,
+        0
+      ],
       "webhookId": "REPLACE-ON-IMPORT",
       "credentials": {
-        "telegramApi": { "id": "REPLACE", "name": "Video Pipeline Bot" }
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Video Pipeline Bot"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "leftValue": "={{$json.message.from.id}}",
-              "rightValue": "={{$env.ALLOWED_USER_ID}}",
-              "operator": { "type": "number", "operation": "equals" }
+              "rightValue": "={{ Number($env.ALLOWED_USER_ID) }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
             }
           ],
           "combinator": "and"
@@ -34,32 +49,50 @@
       "name": "Owner only?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
             {
               "leftValue": "={{$json.message.video}}",
               "rightValue": "",
-              "operator": { "type": "object", "operation": "exists" }
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
             },
             {
               "leftValue": "={{$json.message.video?.duration}}",
               "rightValue": 300,
-              "operator": { "type": "number", "operation": "lte" }
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
             }
           ],
           "combinator": "and"
-        }
+        },
+        "looseTypeValidation": true
       },
       "id": "if-valid-video",
       "name": "Video and <=5min?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [440, -40]
+      "position": [
+        440,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -71,9 +104,15 @@
       "name": "Reject",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [660, 120],
+      "position": [
+        660,
+        120
+      ],
       "credentials": {
-        "telegramApi": { "id": "REPLACE", "name": "Video Pipeline Bot" }
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Video Pipeline Bot"
+        }
       }
     },
     {
@@ -86,7 +125,10 @@
       "name": "Telegram getFile",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, -40]
+      "position": [
+        660,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -117,7 +159,10 @@
       "name": "Build video_url",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [880, -40]
+      "position": [
+        880,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -128,7 +173,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "Accept", "value": "application/vnd.github+json" }
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
           ]
         },
         "sendBody": true,
@@ -140,18 +188,30 @@
       "name": "Trigger GitHub Action",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1100, -40],
+      "position": [
+        1100,
+        -40
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE", "name": "GitHub Token (repo scope)" }
+        "githubApi": {
+          "id": "REPLACE",
+          "name": "GitHub Token (repo scope)"
+        }
       }
     },
     {
-      "parameters": { "amount": 15, "unit": "seconds" },
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
       "id": "wait-initial",
       "name": "Wait for run to appear",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [1320, -40]
+      "position": [
+        1320,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -165,9 +225,15 @@
       "name": "Find run",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1540, -40],
+      "position": [
+        1540,
+        -40
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE", "name": "GitHub Token (repo scope)" }
+        "githubApi": {
+          "id": "REPLACE",
+          "name": "GitHub Token (repo scope)"
+        }
       }
     },
     {
@@ -178,15 +244,36 @@
       "name": "Pick matching run",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1760, -40]
+      "position": [
+        1760,
+        -40
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
-            { "leftValue": "={{$json.found}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } },
-            { "leftValue": "={{$json.status}}", "rightValue": "completed", "operator": { "type": "string", "operation": "equals" } }
+            {
+              "leftValue": "={{$json.found}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "leftValue": "={{$json.status}}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
           ],
           "combinator": "and"
         }
@@ -195,7 +282,10 @@
       "name": "Run completed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1980, -40]
+      "position": [
+        1980,
+        -40
+      ]
     },
     {
       "parameters": {
@@ -205,14 +295,28 @@
       "name": "Check timeout",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1980, 160]
+      "position": [
+        1980,
+        160
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
-            { "leftValue": "={{$json.timedOut}}", "rightValue": true, "operator": { "type": "boolean", "operation": "true" } }
+            {
+              "leftValue": "={{$json.timedOut}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
           ],
           "combinator": "and"
         }
@@ -221,7 +325,10 @@
       "name": "Timed out (>10 min)?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2200, 160]
+      "position": [
+        2200,
+        160
+      ]
     },
     {
       "parameters": {
@@ -233,25 +340,48 @@
       "name": "Notify timeout",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2420, 220],
+      "position": [
+        2420,
+        220
+      ],
       "credentials": {
-        "telegramApi": { "id": "REPLACE", "name": "Video Pipeline Bot" }
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Video Pipeline Bot"
+        }
       }
     },
     {
-      "parameters": { "amount": 25, "unit": "seconds" },
+      "parameters": {
+        "amount": 25,
+        "unit": "seconds"
+      },
       "id": "wait-poll",
       "name": "Wait 25s",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [2420, 60]
+      "position": [
+        2420,
+        60
+      ]
     },
     {
       "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
           "conditions": [
-            { "leftValue": "={{$json.conclusion}}", "rightValue": "success", "operator": { "type": "string", "operation": "equals" } }
+            {
+              "leftValue": "={{$json.conclusion}}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
           ],
           "combinator": "and"
         }
@@ -260,7 +390,10 @@
       "name": "Success?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2200, -120],
+      "position": [
+        2200,
+        -120
+      ],
       "notesInFlow": true
     },
     {
@@ -273,9 +406,15 @@
       "name": "Notify failure",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [2420, -220],
+      "position": [
+        2420,
+        -220
+      ],
       "credentials": {
-        "telegramApi": { "id": "REPLACE", "name": "Video Pipeline Bot" }
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Video Pipeline Bot"
+        }
       }
     },
     {
@@ -290,9 +429,15 @@
       "name": "List artifacts",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2420, -400],
+      "position": [
+        2420,
+        -400
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE", "name": "GitHub Token (repo scope)" }
+        "githubApi": {
+          "id": "REPLACE",
+          "name": "GitHub Token (repo scope)"
+        }
       }
     },
     {
@@ -301,24 +446,42 @@
         "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/artifacts/{{$json.artifacts[0].id}}/zip",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
-        "options": { "response": { "response": { "responseFormat": "file" } } }
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
       },
       "id": "http-download-artifact",
       "name": "Download artifact zip",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2640, -400],
+      "position": [
+        2640,
+        -400
+      ],
       "credentials": {
-        "githubApi": { "id": "REPLACE", "name": "GitHub Token (repo scope)" }
+        "githubApi": {
+          "id": "REPLACE",
+          "name": "GitHub Token (repo scope)"
+        }
       }
     },
     {
-      "parameters": { "operation": "decompress", "fileName": "data" },
+      "parameters": {
+        "operation": "decompress",
+        "fileName": "data"
+      },
       "id": "unzip-artifact",
       "name": "Unzip",
       "type": "n8n-nodes-base.compression",
       "typeVersion": 1.1,
-      "position": [2860, -400]
+      "position": [
+        2860,
+        -400
+      ]
     },
     {
       "parameters": {
@@ -331,45 +494,238 @@
       "name": "Send result",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
-      "position": [3080, -400],
+      "position": [
+        3080,
+        -400
+      ],
       "credentials": {
-        "telegramApi": { "id": "REPLACE", "name": "Video Pipeline Bot" }
+        "telegramApi": {
+          "id": "REPLACE",
+          "name": "Video Pipeline Bot"
+        }
       }
     }
   ],
   "connections": {
-    "Telegram Trigger": { "main": [[{ "node": "Owner only?", "type": "main", "index": 0 }]] },
-    "Owner only?": { "main": [[{ "node": "Video and <=5min?", "type": "main", "index": 0 }], []] },
-    "Video and <=5min?": { "main": [[{ "node": "Telegram getFile", "type": "main", "index": 0 }], [{ "node": "Reject", "type": "main", "index": 0 }]] },
-    "Telegram getFile": { "main": [[{ "node": "Build video_url", "type": "main", "index": 0 }]] },
-    "Build video_url": { "main": [[{ "node": "Trigger GitHub Action", "type": "main", "index": 0 }]] },
-    "Trigger GitHub Action": { "main": [[{ "node": "Wait for run to appear", "type": "main", "index": 0 }]] },
-    "Wait for run to appear": { "main": [[{ "node": "Find run", "type": "main", "index": 0 }]] },
-    "Find run": { "main": [[{ "node": "Pick matching run", "type": "main", "index": 0 }]] },
-    "Pick matching run": { "main": [[{ "node": "Run completed?", "type": "main", "index": 0 }]] },
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Owner only?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner only?": {
+      "main": [
+        [
+          {
+            "node": "Video and <=5min?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Video and <=5min?": {
+      "main": [
+        [
+          {
+            "node": "Telegram getFile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram getFile": {
+      "main": [
+        [
+          {
+            "node": "Build video_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build video_url": {
+      "main": [
+        [
+          {
+            "node": "Trigger GitHub Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger GitHub Action": {
+      "main": [
+        [
+          {
+            "node": "Wait for run to appear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for run to appear": {
+      "main": [
+        [
+          {
+            "node": "Find run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find run": {
+      "main": [
+        [
+          {
+            "node": "Pick matching run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick matching run": {
+      "main": [
+        [
+          {
+            "node": "Run completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Run completed?": {
       "main": [
-        [{ "node": "Success?", "type": "main", "index": 0 }],
-        [{ "node": "Check timeout", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Check timeout": { "main": [[{ "node": "Timed out (>10 min)?", "type": "main", "index": 0 }]] },
+    "Check timeout": {
+      "main": [
+        [
+          {
+            "node": "Timed out (>10 min)?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Timed out (>10 min)?": {
       "main": [
-        [{ "node": "Notify timeout", "type": "main", "index": 0 }],
-        [{ "node": "Wait 25s", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Notify timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 25s",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "Wait 25s": { "main": [[{ "node": "Find run", "type": "main", "index": 0 }]] },
+    "Wait 25s": {
+      "main": [
+        [
+          {
+            "node": "Find run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Success?": {
       "main": [
-        [{ "node": "List artifacts", "type": "main", "index": 0 }],
-        [{ "node": "Notify failure", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "List artifacts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
-    "List artifacts": { "main": [[{ "node": "Download artifact zip", "type": "main", "index": 0 }]] },
-    "Download artifact zip": { "main": [[{ "node": "Unzip", "type": "main", "index": 0 }]] },
-    "Unzip": { "main": [[{ "node": "Send result", "type": "main", "index": 0 }]] }
+    "List artifacts": {
+      "main": [
+        [
+          {
+            "node": "Download artifact zip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download artifact zip": {
+      "main": [
+        [
+          {
+            "node": "Unzip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip": {
+      "main": [
+        [
+          {
+            "node": "Send result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" }
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
 }
