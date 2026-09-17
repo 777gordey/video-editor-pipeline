@@ -524,6 +524,7 @@
         "operation": "sendVideo",
         "chatId": "={{$('Build video_url').first().json.chat_id}}",
         "binaryData": true,
+        "binaryPropertyName": "file_0",
         "additionalFields": {}
       },
       "id": "tg-send-result",
