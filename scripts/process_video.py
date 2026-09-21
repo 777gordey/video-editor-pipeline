@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Обработка видео: транскрипция -> вырезание пауз/слов-паразитов -> кроп 9:16 по лицу
--> субтитры (крупный жирный шрифт, CAPSLOCK на ключевых словах, 1-3 слова на кадр)
--> лёгкая цветокоррекция.
+Обработка уже чисто нарезанного видео: транскрипция -> кроп 9:16 по лицу ->
+хук-фрейм в первые ~1.5-2с -> word-level субтитры (Montserrat Black, ASS/libass,
+подсветка ключевого слова) -> лёгкая цветокоррекция.
 
 Запускается на раннере GitHub Actions из edit-video.yml.
-Вход: путь к исходному видео. Выход: final.mp4 в текущей директории.
+Вход: путь к исходному видео (без пауз/слов-паразитов — вырезаны заранее).
+Выход: final.mp4 в текущей директории.
 """
 import argparse
 import json
@@ -13,17 +14,19 @@ import subprocess
 import sys
 from pathlib import Path
 
-MAX_PAUSE = 0.4          # сек — паузы длиннее вырезаются
-PAD = 0.06                # сек — защитный отступ вокруг сохраняемых слов
-MIN_GAP_KEPT = 0.12        # сек — естественная пауза, которую оставляем между сегментами
 TARGET_W, TARGET_H = 1080, 1920
+FONT_NAME = "Montserrat Black"
+FONTS_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
 
-FILLER_WORDS = {
+CHAR_BUDGET = 38          # символов на чанк субтитров (кириллица длиннее английской)
+MAX_WORDS_PER_CHUNK = 4
+HOOK_MAX_WORDS = 8
+HOOK_MAX_SECONDS = 2.0    # хук держится не дольше этого, даже если слова длиннее
+HOOK_MIN_SECONDS = 1.5
+
+STOPWORDS_FOR_KEYWORD = {
     "э", "эм", "эмм", "ээ", "ну", "как бы", "типа", "короче", "вот",
     "это самое", "в общем", "значит", "так сказать", "собственно",
-    "um", "uh", "erm", "like", "you know", "so", "actually", "basically",
-}
-STOPWORDS_FOR_KEYWORD = FILLER_WORDS | {
     "и", "в", "на", "с", "по", "к", "у", "о", "а", "но", "или", "что", "как",
     "это", "то", "не", "я", "мы", "вы", "он", "она", "они", "да", "нет",
     "the", "a", "an", "and", "or", "of", "to", "in", "on", "is", "it", "i",
@@ -62,90 +65,6 @@ def transcribe(path):
                 "end": float(w.end),
             })
     return words
-
-
-def is_filler(word: str) -> bool:
-    return word.strip(".,!?…").lower() in FILLER_WORDS
-
-
-def build_keep_segments(words):
-    """Строит список (start, end) сегментов оригинального таймлайна, которые
-    нужно сохранить: без слов-паразитов и без пауз длиннее MAX_PAUSE."""
-    keep = []
-    cur_start = None
-    prev_end = None
-
-    for w in words:
-        if is_filler(w["word"]):
-            if cur_start is not None:
-                keep.append((cur_start, prev_end + PAD))
-                cur_start = None
-            prev_end = w["end"]
-            continue
-
-        if cur_start is None:
-            cur_start = max(0.0, w["start"] - PAD)
-        elif prev_end is not None and (w["start"] - prev_end) > MAX_PAUSE:
-            keep.append((cur_start, prev_end + PAD))
-            cur_start = max(prev_end + PAD, w["start"] - PAD)
-
-        prev_end = w["end"]
-
-    if cur_start is not None and prev_end is not None:
-        keep.append((cur_start, prev_end + PAD))
-
-    return keep
-
-
-def remap_words(words, keep_segments):
-    """Пересчитывает таймстампы слов в новый таймлайн после вырезания сегментов
-    и возвращает только слова, попавшие в сохранённые сегменты."""
-    remapped = []
-    offset = 0.0
-    for seg_start, seg_end in keep_segments:
-        for w in words:
-            if is_filler(w["word"]):
-                continue
-            if seg_start <= w["start"] < seg_end:
-                remapped.append({
-                    "word": w["word"],
-                    "start": offset + (w["start"] - seg_start),
-                    "end": offset + (min(w["end"], seg_end) - seg_start),
-                })
-        offset += (seg_end - seg_start) + MIN_GAP_KEPT
-    return remapped
-
-
-def cut_video(src: Path, keep_segments, dst: Path):
-    if not keep_segments:
-        raise RuntimeError("Нечего сохранять: транскрипция пустая или всё — паузы/паразиты")
-
-    filter_parts = []
-    v_labels, a_labels = [], []
-    for i, (s, e) in enumerate(keep_segments):
-        filter_parts.append(
-            f"[0:v]trim=start={s:.3f}:end={e:.3f},setpts=PTS-STARTPTS[v{i}]"
-        )
-        filter_parts.append(
-            f"[0:a]atrim=start={s:.3f}:end={e:.3f},asetpts=PTS-STARTPTS[a{i}]"
-        )
-        v_labels.append(f"[v{i}]")
-        a_labels.append(f"[a{i}]")
-
-    concat_inputs = "".join(f"{v}{a}" for v, a in zip(v_labels, a_labels))
-    filter_parts.append(
-        f"{concat_inputs}concat=n={len(keep_segments)}:v=1:a=1[vout][aout]"
-    )
-    filter_complex = ";".join(filter_parts)
-
-    run([
-        "ffmpeg", "-y", "-i", str(src),
-        "-filter_complex", filter_complex,
-        "-map", "[vout]", "-map", "[aout]",
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-        "-c:a", "aac", "-b:a", "160k",
-        str(dst),
-    ])
 
 
 def detect_face_center_x(path: Path) -> float:
@@ -233,23 +152,29 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial Black,88,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,7,0,2,60,60,220,1
+Style: Default,{FONT_NAME},80,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,2,60,60,640,1
+Style: Hook,{FONT_NAME},92,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,3,24,6,8,70,70,460,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     lines = [header]
 
-    CHUNK = 2  # слов на экран (в диапазоне 1-3)
-    i = 0
-    while i < len(words):
-        chunk = words[i:i + CHUNK]
-        i += CHUNK
-        if not chunk:
-            continue
-        start, end = chunk[0]["start"], chunk[-1]["end"]
-        if end <= start:
-            continue
+    hook_words, body_words = split_hook(words)
+
+    if hook_words:
+        hook_end = hook_display_end(hook_words)
+        hook_text = ass_escape(" ".join(w["word"] for w in hook_words))
+        lines.append(
+            f"Dialogue: 1,{fmt_ts(0.0)},{fmt_ts(hook_end)},Hook,,0,0,0,,"
+            f"{{\\fad(180,120)}}{hook_text.upper()}\n"
+        )
+    else:
+        hook_end = 0.0
+
+    for chunk in chunk_words(body_words):
+        start = max(chunk[0]["start"], hook_end)
+        end = max(chunk[-1]["end"], start + 0.35)
 
         keyword = max(
             chunk,
@@ -272,11 +197,56 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     out_path.write_text("".join(lines), encoding="utf-8")
 
 
+def split_hook(words):
+    """Отделяет первые слова хук-фразы (до HOOK_MAX_WORDS слов и не позже
+    HOOK_MAX_SECONDS) от остального текста, идущего в обычные субтитры."""
+    if not words:
+        return [], []
+    hook = []
+    for w in words:
+        if len(hook) >= HOOK_MAX_WORDS or w["start"] >= HOOK_MAX_SECONDS:
+            break
+        hook.append(w)
+    if not hook:
+        hook = [words[0]]
+    return hook, words[len(hook):]
+
+
+def hook_display_end(hook_words) -> float:
+    raw_end = hook_words[-1]["end"] + 0.2
+    return min(max(raw_end, HOOK_MIN_SECONDS), HOOK_MAX_SECONDS + 0.4)
+
+
+def chunk_words(words):
+    """Группирует слова в чанки бегущих субтитров по бюджету символов
+    (не по числу слов — русские слова длиннее английских)."""
+    chunk = []
+    chunk_chars = 0
+    for w in words:
+        w_len = len(w["word"])
+        would_exceed = chunk and (
+            chunk_chars + 1 + w_len > CHAR_BUDGET or len(chunk) >= MAX_WORDS_PER_CHUNK
+        )
+        if would_exceed:
+            yield chunk
+            chunk = []
+            chunk_chars = 0
+        chunk.append(w)
+        chunk_chars += (1 if chunk_chars else 0) + w_len
+        if w["word"].strip().endswith((".", "!", "?", "…")):
+            yield chunk
+            chunk = []
+            chunk_chars = 0
+    if chunk:
+        yield chunk
+
+
 def burn_subtitles(src: Path, ass_path: Path, dst: Path):
     ass_escaped = str(ass_path).replace("\\", "/").replace(":", r"\:")
+    fonts_escaped = str(FONTS_DIR).replace("\\", "/").replace(":", r"\:")
     run([
         "ffmpeg", "-y", "-i", str(src),
-        "-vf", f"ass={ass_escaped}",
+        "-vf", f"ass={ass_escaped}:fontsdir={fonts_escaped}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
         "-c:a", "copy",
         str(dst),
@@ -305,23 +275,15 @@ def main():
         print("ОШИБКА: транскрипция не вернула слов (тишина/нет речи?)", file=sys.stderr)
         sys.exit(3)
 
-    keep_segments = build_keep_segments(words)
-    print(f"Сохраняемых сегментов: {len(keep_segments)}", file=sys.stderr)
-
-    cut_path = Path("cut.mp4")
-    cut_video(args.input, keep_segments, cut_path)
-
-    remapped_words = remap_words(words, keep_segments)
-
     print("Детекция лица...", file=sys.stderr)
-    face_x = detect_face_center_x(cut_path)
+    face_x = detect_face_center_x(args.input)
     print(f"face_center_x={face_x:.3f}", file=sys.stderr)
 
     cropped_path = Path("cropped.mp4")
-    crop_grade_916(cut_path, cropped_path, face_x)
+    crop_grade_916(args.input, cropped_path, face_x)
 
     ass_path = Path("subs.ass")
-    build_ass(remapped_words, ass_path)
+    build_ass(words, ass_path)
 
     burn_subtitles(cropped_path, ass_path, args.out)
     print(f"Готово: {args.out}", file=sys.stderr)
