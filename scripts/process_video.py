@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 """
 Обработка уже чисто нарезанного видео: транскрипция -> кроп 9:16 по лицу ->
-хук-фрейм в первые ~1.5-2с -> word-level субтитры (Montserrat Black, ASS/libass,
-подсветка ключевого слова) -> лёгкая цветокоррекция.
+хук-фрейм в первые ~1.5-2с (FFmpeg/libass) -> punch-in зумы (FFmpeg) ->
+b-roll вставки (Pexels/Pixabay, выбор моментов через LLM, scripts/broll.py) ->
+субтитры на остальное видео через Shotstack API (scripts/shotstack_captions.py)
+-> лёгкая цветокоррекция.
+
+Субтитры и b-roll куплены как API, а не реализованы локально (libass ASS
+для body-текста и ручной подбор b-roll были заменены по архитектурному
+решению — самые визуально заметные и сложные в поддержке части). Хук-фраза,
+punch-in зум и цветокоррекция остаются в FFmpeg.
 
 Запускается на раннере GitHub Actions из edit-video.yml.
 Вход: путь к исходному видео (без пауз/слов-паразитов — вырезаны заранее).
 Выход: final.mp4 в текущей директории.
+Требует переменные окружения: OPENAI_API_KEY, SHOTSTACK_API_KEY,
+PEXELS_API_KEY и/или PIXABAY_API_KEY.
 """
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -24,13 +34,10 @@ HOOK_MAX_WORDS = 8
 HOOK_MAX_SECONDS = 2.0    # хук держится не дольше этого, даже если слова длиннее
 HOOK_MIN_SECONDS = 1.5
 
-STOPWORDS_FOR_KEYWORD = {
-    "э", "эм", "эмм", "ээ", "ну", "как бы", "типа", "короче", "вот",
-    "это самое", "в общем", "значит", "так сказать", "собственно",
-    "и", "в", "на", "с", "по", "к", "у", "о", "а", "но", "или", "что", "как",
-    "это", "то", "не", "я", "мы", "вы", "он", "она", "они", "да", "нет",
-    "the", "a", "an", "and", "or", "of", "to", "in", "on", "is", "it", "i",
-}
+PUNCH_ZOOM = 1.12         # во сколько раз "впрыгиваем" при punch-in
+PUNCH_EASE = 0.12         # длительность самого прыжка (сек), дальше держим уровень
+PUNCH_MIN_GAP = 3.5       # не чаще одного пунча за этот интервал (сек)
+PUNCH_MAX_COUNT = 40      # защита от чрезмерно длинной ffmpeg-expr на 5-минутном видео
 
 
 def run(cmd, **kw):
@@ -132,6 +139,79 @@ def crop_grade_916(src: Path, dst: Path, face_center_x: float):
     ])
 
 
+def pick_punch_times(body_words, hook_end: float, duration: float) -> list:
+    """Выбирает моменты punch-in зумов: начало каждого субтитр-чанка (та же
+    группировка, что и для текста) после хука, прорежённое минимальным
+    интервалом. Порядок величины — 1 пунч на ~3.5-5с, не на каждое слово."""
+    candidates = [
+        chunk[0]["start"] for chunk in chunk_words(body_words)
+        if chunk and chunk[0]["start"] > hook_end
+    ]
+    picked = []
+    last = hook_end
+    for t in candidates:
+        if t - last >= PUNCH_MIN_GAP and t < duration - 0.5:
+            picked.append(t)
+            last = t
+        if len(picked) >= PUNCH_MAX_COUNT:
+            break
+    return picked
+
+
+def _ease_expr(t_var: str, p: float, prev_zoom: float, cur_zoom: float) -> str:
+    """smoothstep-переход zoom от prev_zoom к cur_zoom, начиная с момента p,
+    длится PUNCH_EASE секунд, дальше остаётся равным cur_zoom (т.к. x
+    клэмпится в [0,1] и smoothstep(1)=1) — отдельного 'hold'-плеча не нужно."""
+    x = f"min(max(({t_var}-{p:.3f})/{PUNCH_EASE:.3f},0),1)"
+    s = f"({x}*{x}*(3-2*{x}))"
+    return f"({prev_zoom:.4f}+({cur_zoom:.4f}-{prev_zoom:.4f})*{s})"
+
+
+def build_zoom_expr(punch_times: list) -> str:
+    """Строит вложенный if() на переменную 't', возвращающий текущий
+    zoom-уровень кадра. Уровни чередуются BASE(1.0)/PUNCH_ZOOM на каждом
+    пункт-моменте — то есть каждый следующий пунч "впрыгивает", следующий за
+    ним возвращает в исходный масштаб."""
+    if not punch_times:
+        return "1.0"
+    levels = [PUNCH_ZOOM if i % 2 == 0 else 1.0 for i in range(len(punch_times))]
+    prev_levels = [1.0] + levels[:-1]
+
+    expr = "1.0"
+    for p, prev, cur in zip(punch_times, prev_levels, levels):
+        inner = _ease_expr("t", p, prev, cur)
+        expr = f"if(lt(t,{p:.3f}),{expr},{inner})"
+    return expr
+
+
+def punch_zoom(src: Path, dst: Path, punch_times: list):
+    """Кроп+скейл с time-varying zoom-уровнем (punch-in), работает уже на
+    финальном 1080x1920 кадре (после crop_grade_916) — субтитры затем
+    накладываются поверх уже "запунченного" видео и не двигаются вместе с
+    зумом, как в CapCut."""
+    if not punch_times:
+        run(["ffmpeg", "-y", "-i", str(src), "-c", "copy", str(dst)])
+        return
+
+    zoom = build_zoom_expr(punch_times)
+    crop_w = f"({TARGET_W}/({zoom}))"
+    crop_h = f"({TARGET_H}/({zoom}))"
+    x = f"(({TARGET_W}-{crop_w})/2)"
+    y = f"(({TARGET_H}-{crop_h})/2)"
+
+    vf = (
+        f"crop=w='{crop_w}':h='{crop_h}':x='{x}':y='{y}',"
+        f"scale={TARGET_W}:{TARGET_H}"
+    )
+    run([
+        "ffmpeg", "-y", "-i", str(src),
+        "-vf", vf,
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "19",
+        "-c:a", "copy",
+        str(dst),
+    ])
+
+
 def ass_escape(text: str) -> str:
     return text.replace("\\", r"\\").replace("{", r"\{").replace("}", r"\}")
 
@@ -143,7 +223,10 @@ def fmt_ts(t: float) -> str:
     return f"{h:d}:{m:02d}:{s:05.2f}"
 
 
-def build_ass(words, out_path: Path):
+def build_hook_ass(hook_words, out_path: Path):
+    """ASS только с хук-фразой (первые ~1.5-2с) — рендерится через FFmpeg/
+    libass, отдельно от основных субтитров (те теперь идут через Shotstack,
+    см. build_srt/burn_captions_via_shotstack)."""
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {TARGET_W}
@@ -152,49 +235,50 @@ ScaledBorderAndShadow: yes
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{FONT_NAME},80,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,-1,0,0,0,100,100,0,0,1,6,0,2,60,60,640,1
 Style: Hook,{FONT_NAME},92,&H00FFFFFF,&H000000FF,&H00000000,&H64000000,-1,0,0,0,100,100,0,0,3,24,6,8,70,70,460,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
-    lines = [header]
+    hook_end = hook_display_end(hook_words)
+    hook_text = ass_escape(" ".join(w["word"] for w in hook_words)).upper()
+    line = (
+        f"Dialogue: 1,{fmt_ts(0.0)},{fmt_ts(hook_end)},Hook,,0,0,0,,"
+        f"{{\\fad(180,120)}}{hook_text}\n"
+    )
+    out_path.write_text(header + line, encoding="utf-8")
 
+
+def fmt_srt_ts(t: float) -> str:
+    h = int(t // 3600)
+    m = int((t % 3600) // 60)
+    s = int(t % 60)
+    ms = round((t - int(t)) * 1000)
+    if ms == 1000:
+        ms = 0
+        s += 1
+    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+def build_srt(words, out_path: Path):
+    """SRT для внешнего caption-API (Shotstack/ZapCap) — та же группировка
+    чанков, что и для ASS (chunk_words), без хука (хук остаётся в FFmpeg,
+    см. main()) и без цветовой подсветки ключевого слова (обычный SRT её не
+    несёт; для этого нужен RichCaptionAsset — проверить на живом ключе,
+    пока используем базовый caption-тип)."""
     hook_words, body_words = split_hook(words)
+    hook_end = hook_display_end(hook_words) if hook_words else 0.0
 
-    if hook_words:
-        hook_end = hook_display_end(hook_words)
-        hook_text = ass_escape(" ".join(w["word"] for w in hook_words))
-        lines.append(
-            f"Dialogue: 1,{fmt_ts(0.0)},{fmt_ts(hook_end)},Hook,,0,0,0,,"
-            f"{{\\fad(180,120)}}{hook_text.upper()}\n"
-        )
-    else:
-        hook_end = 0.0
-
+    lines = []
+    idx = 1
     for chunk in chunk_words(body_words):
         start = max(chunk[0]["start"], hook_end)
         end = max(chunk[-1]["end"], start + 0.35)
+        text = " ".join(w["word"] for w in chunk)
+        lines.append(f"{idx}\n{fmt_srt_ts(start)} --> {fmt_srt_ts(end)}\n{text}\n")
+        idx += 1
 
-        keyword = max(
-            chunk,
-            key=lambda w: len(w["word"]) if w["word"].strip(".,!?…").lower()
-            not in STOPWORDS_FOR_KEYWORD else 0,
-        )
-
-        parts = []
-        for w in chunk:
-            text = ass_escape(w["word"])
-            if w is keyword and text.strip(".,!?…"):
-                text = f"{{\\c&H00D7FF&}}{text.upper()}{{\\c&HFFFFFF&}}"
-            parts.append(text)
-        line_text = " ".join(parts)
-
-        lines.append(
-            f"Dialogue: 0,{fmt_ts(start)},{fmt_ts(end)},Default,,0,0,0,,{line_text}\n"
-        )
-
-    out_path.write_text("".join(lines), encoding="utf-8")
+    out_path.write_text("\n".join(lines), encoding="utf-8")
 
 
 def split_hook(words):
@@ -241,7 +325,7 @@ def chunk_words(words):
         yield chunk
 
 
-def burn_subtitles(src: Path, ass_path: Path, dst: Path):
+def burn_ass(src: Path, ass_path: Path, dst: Path):
     ass_escaped = str(ass_path).replace("\\", "/").replace(":", r"\:")
     fonts_escaped = str(FONTS_DIR).replace("\\", "/").replace(":", r"\:")
     run([
@@ -259,6 +343,20 @@ def main():
     ap.add_argument("--max-seconds", type=float, default=300)
     ap.add_argument("--out", type=Path, default=Path("final.mp4"))
     args = ap.parse_args()
+
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    pexels_key = os.environ.get("PEXELS_API_KEY")
+    pixabay_key = os.environ.get("PIXABAY_API_KEY")
+    shotstack_key = os.environ.get("SHOTSTACK_API_KEY")
+    missing = [name for name, val in (
+        ("OPENAI_API_KEY", openai_key), ("SHOTSTACK_API_KEY", shotstack_key),
+    ) if not val]
+    if missing:
+        print(f"ОШИБКА: не заданы переменные окружения: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(4)
+    if not pexels_key and not pixabay_key:
+        print("ОШИБКА: задай хотя бы PEXELS_API_KEY или PIXABAY_API_KEY", file=sys.stderr)
+        sys.exit(4)
 
     duration = ffprobe_duration(args.input)
     print(f"Исходная длительность: {duration:.1f}s", file=sys.stderr)
@@ -282,10 +380,37 @@ def main():
     cropped_path = Path("cropped.mp4")
     crop_grade_916(args.input, cropped_path, face_x)
 
-    ass_path = Path("subs.ass")
-    build_ass(words, ass_path)
+    hook_words, body_words = split_hook(words)
+    hook_end = hook_display_end(hook_words) if hook_words else 0.0
+    punch_times = pick_punch_times(body_words, hook_end, duration)
+    print(f"punch-in моментов: {len(punch_times)}", file=sys.stderr)
 
-    burn_subtitles(cropped_path, ass_path, args.out)
+    punched_path = Path("punched.mp4")
+    punch_zoom(cropped_path, punched_path, punch_times)
+
+    if hook_words:
+        print("Хук-фраза (FFmpeg/libass)...", file=sys.stderr)
+        hook_ass_path = Path("hook.ass")
+        build_hook_ass(hook_words, hook_ass_path)
+        hooked_path = Path("hooked.mp4")
+        burn_ass(punched_path, hook_ass_path, hooked_path)
+    else:
+        hooked_path = punched_path
+
+    print("B-roll (Pexels/Pixabay, моменты выбирает LLM)...", file=sys.stderr)
+    from broll import add_broll
+    broll_path = Path("with_broll.mp4")
+    add_broll(
+        hooked_path, words, duration, broll_path,
+        openai_key, pexels_key, pixabay_key, work_dir=Path("."),
+    )
+
+    print("Субтитры (Shotstack API)...", file=sys.stderr)
+    from shotstack_captions import burn_captions_via_shotstack
+    srt_path = Path("subs.srt")
+    build_srt(words, srt_path)
+    burn_captions_via_shotstack(broll_path, srt_path, args.out, shotstack_key)
+
     print(f"Готово: {args.out}", file=sys.stderr)
 
 

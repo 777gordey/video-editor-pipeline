@@ -4,3 +4,5 @@ videos/
 .env
 .env.*
 n8n_inspect*.json
+__pycache__/
+*.pyc
