@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 """
 Обработка уже чисто нарезанного видео: транскрипция -> кроп 9:16 по лицу ->
-хук-фрейм в первые ~1.5-2с (FFmpeg/libass) -> punch-in зумы (FFmpeg) ->
-b-roll вставки (Pexels/Pixabay, выбор моментов через LLM, scripts/broll.py) ->
-субтитры на остальное видео через Shotstack API (scripts/shotstack_captions.py)
--> лёгкая цветокоррекция.
+LLM размечает смыслово важные чанки субтитров (для акцентного размера текста
+и синхронизации со звуком) -> punch-in зумы (FFmpeg) -> фоновая музыка с
+дакингом под речь + whoosh на punch-in (FFmpeg, локальные файлы assets/) ->
+хук-фрейм в первые ~1.5-2с (FFmpeg/libass) -> b-roll вставки (Pexels/Pixabay,
+выбор моментов через LLM, scripts/broll.py) -> субтитры через Shotstack
+rich-text API с увеличенным размером на акцентных чанках
+(scripts/shotstack_captions.py) -> обложка (scripts/thumbnail.py).
 
 Субтитры и b-roll куплены как API, а не реализованы локально (libass ASS
 для body-текста и ручной подбор b-roll были заменены по архитектурному
 решению — самые визуально заметные и сложные в поддержке части). Хук-фраза,
-punch-in зум и цветокоррекция остаются в FFmpeg.
+punch-in зум, аудио-микс и цветокоррекция остаются в FFmpeg.
 
 Запускается на раннере GitHub Actions из edit-video.yml.
 Вход: путь к исходному видео (без пауз/слов-паразитов — вырезаны заранее).
-Выход: final.mp4 в текущей директории.
+Выход: final.mp4 + thumbnail_*.jpg в текущей директории.
 Требует переменные окружения: OPENAI_API_KEY, SHOTSTACK_API_KEY,
 PEXELS_API_KEY и/или PIXABAY_API_KEY.
 """
@@ -139,19 +142,21 @@ def crop_grade_916(src: Path, dst: Path, face_center_x: float):
     ])
 
 
-def pick_punch_times(body_words, hook_end: float, duration: float) -> list:
-    """Выбирает моменты punch-in зумов: начало каждого субтитр-чанка (та же
-    группировка, что и для текста) после хука, прорежённое минимальным
-    интервалом. Порядок величины — 1 пунч на ~3.5-5с, не на каждое слово."""
-    candidates = [
-        chunk[0]["start"] for chunk in chunk_words(body_words)
-        if chunk and chunk[0]["start"] > hook_end
-    ]
+def pick_punch_times(chunks: list, hook_end: float, duration: float) -> list:
+    """Выбирает моменты punch-in зумов: начало каждого субтитр-чанка после
+    хука, прорежённое минимальным интервалом. Порядок величины — 1 пунч на
+    ~3.5-5с, не на каждое слово. Возвращает список (time, chunk_index) —
+    chunk_index даёт возможность синхронизировать punch-эффекты с теми же
+    чанками, что LLM отметил как смыслово важные (см. add_whoosh_sfx в
+    audio_mix.py), не гадая по времени заново."""
     picked = []
     last = hook_end
-    for t in candidates:
+    for i, chunk in enumerate(chunks):
+        t = chunk["start"]
+        if t <= hook_end:
+            continue
         if t - last >= PUNCH_MIN_GAP and t < duration - 0.5:
-            picked.append(t)
+            picked.append((t, i))
             last = t
         if len(picked) >= PUNCH_MAX_COUNT:
             break
@@ -226,7 +231,7 @@ def fmt_ts(t: float) -> str:
 def build_hook_ass(hook_words, out_path: Path):
     """ASS только с хук-фразой (первые ~1.5-2с) — рендерится через FFmpeg/
     libass, отдельно от основных субтитров (те теперь идут через Shotstack,
-    см. build_srt/burn_captions_via_shotstack)."""
+    см. build_caption_chunks/burn_captions_via_shotstack)."""
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {TARGET_W}
@@ -249,36 +254,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     out_path.write_text(header + line, encoding="utf-8")
 
 
-def fmt_srt_ts(t: float) -> str:
-    h = int(t // 3600)
-    m = int((t % 3600) // 60)
-    s = int(t % 60)
-    ms = round((t - int(t)) * 1000)
-    if ms == 1000:
-        ms = 0
-        s += 1
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
-
-def build_srt(words, out_path: Path):
-    """SRT для внешнего caption-API (Shotstack/ZapCap) — та же группировка
-    чанков, что и для ASS (chunk_words), без хука (хук остаётся в FFmpeg,
-    см. main()) и без цветовой подсветки ключевого слова (обычный SRT её не
-    несёт; для этого нужен RichCaptionAsset — проверить на живом ключе,
-    пока используем базовый caption-тип)."""
+def build_caption_chunks(words) -> list:
+    """Группирует body_words (без хука) в чанки субтитров — та же логика,
+    что раньше писала SRT, но возвращает структуры {start,end,text} напрямую
+    для Shotstack rich-text таймлайна (см. shotstack_captions.py) вместо
+    промежуточного SRT-файла: он был нужен только для базового типа
+    'caption', а rich-text строится из явных клипов."""
     hook_words, body_words = split_hook(words)
     hook_end = hook_display_end(hook_words) if hook_words else 0.0
 
-    lines = []
-    idx = 1
+    chunks = []
     for chunk in chunk_words(body_words):
         start = max(chunk[0]["start"], hook_end)
         end = max(chunk[-1]["end"], start + 0.35)
         text = " ".join(w["word"] for w in chunk)
-        lines.append(f"{idx}\n{fmt_srt_ts(start)} --> {fmt_srt_ts(end)}\n{text}\n")
-        idx += 1
-
-    out_path.write_text("\n".join(lines), encoding="utf-8")
+        chunks.append({"start": start, "end": end, "text": text})
+    return chunks
 
 
 def split_hook(words):
@@ -382,20 +373,35 @@ def main():
 
     hook_words, body_words = split_hook(words)
     hook_end = hook_display_end(hook_words) if hook_words else 0.0
-    punch_times = pick_punch_times(body_words, hook_end, duration)
+    chunks = build_caption_chunks(words)
+
+    print("Разметка акцентов субтитров (LLM)...", file=sys.stderr)
+    from shotstack_captions import pick_emphasis_chunks
+    emphasized_idx = pick_emphasis_chunks(chunks, openai_key)
+    print(f"акцентных чанков: {len(emphasized_idx)}/{len(chunks)}", file=sys.stderr)
+
+    punches = pick_punch_times(chunks, hook_end, duration)
+    punch_times = [t for t, _ in punches]
     print(f"punch-in моментов: {len(punch_times)}", file=sys.stderr)
 
     punched_path = Path("punched.mp4")
     punch_zoom(cropped_path, punched_path, punch_times)
+
+    print("Музыка + звуки на punch-in...", file=sys.stderr)
+    from audio_mix import pick_whoosh_times, mix_audio
+    whoosh_times = pick_whoosh_times(punches, emphasized_idx)
+    print(f"whoosh-моментов: {len(whoosh_times)}", file=sys.stderr)
+    mixed_path = Path("mixed_audio.mp4")
+    mix_audio(punched_path, mixed_path, duration, words, whoosh_times)
 
     if hook_words:
         print("Хук-фраза (FFmpeg/libass)...", file=sys.stderr)
         hook_ass_path = Path("hook.ass")
         build_hook_ass(hook_words, hook_ass_path)
         hooked_path = Path("hooked.mp4")
-        burn_ass(punched_path, hook_ass_path, hooked_path)
+        burn_ass(mixed_path, hook_ass_path, hooked_path)
     else:
-        hooked_path = punched_path
+        hooked_path = mixed_path
 
     print("B-roll (Pexels/Pixabay, моменты выбирает LLM)...", file=sys.stderr)
     from broll import add_broll
@@ -405,11 +411,17 @@ def main():
         openai_key, pexels_key, pixabay_key, work_dir=Path("."),
     )
 
-    print("Субтитры (Shotstack API)...", file=sys.stderr)
+    print("Субтитры (Shotstack rich-text, с акцентным размером)...", file=sys.stderr)
     from shotstack_captions import burn_captions_via_shotstack
-    srt_path = Path("subs.srt")
-    build_srt(words, srt_path)
-    burn_captions_via_shotstack(broll_path, srt_path, args.out, shotstack_key)
+    burn_captions_via_shotstack(broll_path, chunks, emphasized_idx, args.out, shotstack_key)
+
+    print("Обложка...", file=sys.stderr)
+    from thumbnail import make_thumbnail
+    hook_text = " ".join(w["word"] for w in hook_words) if hook_words else ""
+    thumb_v, thumb_h = make_thumbnail(
+        args.out, hook_text, words, duration, Path("."), openai_key,
+    )
+    print(f"Обложка: {thumb_v}, {thumb_h}", file=sys.stderr)
 
     print(f"Готово: {args.out}", file=sys.stderr)
 

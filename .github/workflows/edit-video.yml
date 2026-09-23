@@ -3,6 +3,13 @@ name: Edit video
 on:
   repository_dispatch:
     types: [process-video]
+  # Ручной запуск для тестирования на ветке (без n8n/Telegram) — тот же
+  # раннер, те же секреты. video_url обязателен: прямая ссылка на mp4.
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Прямая ссылка на исходное видео (mp4)"
+        required: true
 
 jobs:
   process:
@@ -25,18 +32,18 @@ jobs:
       - name: Install Python deps
         run: |
           python -m pip install --upgrade pip
-          pip install faster-whisper "opencv-python-headless<5" requests
+          pip install faster-whisper "opencv-python-headless<5" requests Pillow
 
-      # video_url приходит из client_payload и может содержать секрет
-      # (например Telegram File API токен) — никогда не печатаем/не логируем
-      # его в открытом виде, только маскируем и используем внутри curl.
+      # video_url приходит из client_payload (или вручную через workflow_dispatch)
+      # и может содержать секрет (например Telegram File API токен) — никогда
+      # не печатаем/не логируем его в открытом виде, только маскируем.
       - name: Mask video_url in logs
         run: |
-          echo "::add-mask::${{ github.event.client_payload.video_url }}"
+          echo "::add-mask::${{ github.event.client_payload.video_url }}${{ github.event.inputs.video_url }}"
 
       - name: Download source video
         env:
-          VIDEO_URL: ${{ github.event.client_payload.video_url }}
+          VIDEO_URL: ${{ github.event.client_payload.video_url || github.event.inputs.video_url }}
         run: |
           curl -sS -f -L "$VIDEO_URL" -o source.mp4
           test -s source.mp4
@@ -54,6 +61,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: final-video
-          path: final.mp4
+          path: |
+            final.mp4
+            thumbnail_*.jpg
           retention-days: 1
           if-no-files-found: error
