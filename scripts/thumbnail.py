@@ -29,6 +29,7 @@ from pathlib import Path
 
 import cv2
 import requests
+from openai_http import openai_post
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 FONT_PATH = Path(__file__).resolve().parent.parent / "assets" / "fonts" / "Montserrat-Black.ttf"
@@ -146,13 +147,10 @@ def pick_best_frame_and_caption(candidate_paths: list, hook_text: str,
         for p in candidate_paths:
             content.append({"type": "input_image", "image_url": _encode_for_llm(p)})
 
-        resp = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": OPENAI_MODEL, "input": [{"role": "user", "content": content}]},
-            timeout=60,
+        resp = openai_post(
+            {"model": OPENAI_MODEL, "input": [{"role": "user", "content": content}]},
+            api_key,
         )
-        resp.raise_for_status()
         body = resp.json()
         raw = next(
             c["text"]

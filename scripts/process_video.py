@@ -406,10 +406,14 @@ def main():
     print("B-roll (Pexels/Pixabay, моменты выбирает LLM)...", file=sys.stderr)
     from broll import add_broll
     broll_path = Path("with_broll.mp4")
-    add_broll(
-        hooked_path, words, duration, broll_path,
-        openai_key, pexels_key, pixabay_key, work_dir=Path("."),
-    )
+    try:
+        add_broll(
+            hooked_path, words, duration, broll_path,
+            openai_key, pexels_key, pixabay_key, work_dir=Path("."),
+        )
+    except Exception as e:
+        print(f"B-ROLL SKIPPED: {type(e).__name__}: {e}", file=sys.stderr)
+        broll_path = hooked_path
 
     print("Субтитры (Shotstack rich-text, с акцентным размером)...", file=sys.stderr)
     from shotstack_captions import burn_captions_via_shotstack

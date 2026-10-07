@@ -25,6 +25,8 @@ from pathlib import Path
 
 import requests
 
+from openai_http import openai_post
+
 TARGET_W, TARGET_H = 1080, 1920
 
 BROLL_MIN_GAP = 4.0        # не чаще одной вставки за этот интервал (сек)
@@ -61,19 +63,7 @@ def pick_broll_candidates(words, api_key: str, duration: float) -> list:
 Ответь СТРОГО JSON-массивом без пояснений, каждый элемент:
 {{"start": <сек>, "duration": <{BROLL_MIN_DURATION}-{BROLL_MAX_DURATION}>, "query_en": "<2-4 английских слова для поиска стокового видео>"}}"""
 
-    resp = requests.post(
-        "https://api.openai.com/v1/responses",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": OPENAI_MODEL,
-            "input": prompt,
-        },
-        timeout=60,
-    )
-    resp.raise_for_status()
+    resp = openai_post({"model": OPENAI_MODEL, "input": prompt}, api_key)
     body = resp.json()
     # Responses API: response["output"] -- список айтемов, текст лежит в
     # output[i].content[j].text у айтемов type=="message". Схема почерпнута

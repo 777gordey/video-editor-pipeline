@@ -41,6 +41,8 @@ from pathlib import Path
 
 import requests
 
+from openai_http import openai_post
+
 API_BASE = "https://api.shotstack.io"
 INGEST_STAGE = f"{API_BASE}/ingest/stage"
 EDIT_STAGE = f"{API_BASE}/edit/stage"   # stage = бесплатный sandbox с водяным знаком
@@ -152,16 +154,7 @@ def pick_emphasis_chunks(chunks: list, api_key: str) -> set:
 Ответь СТРОГО JSON-массивом индексов без пояснений, например [2, 5, 9]."""
 
     try:
-        resp = requests.post(
-            "https://api.openai.com/v1/responses",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={"model": OPENAI_MODEL, "input": prompt},
-            timeout=60,
-        )
-        resp.raise_for_status()
+        resp = openai_post({"model": OPENAI_MODEL, "input": prompt}, api_key)
         body = resp.json()
         raw = next(
             c["text"]
