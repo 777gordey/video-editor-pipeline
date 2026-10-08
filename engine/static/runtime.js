@@ -17,6 +17,9 @@
   const ZM = { V1: 1.15, V2: 1.1, V3: 0.7, V4: 1.0, V5: 0.55 }[S.id];
   const F = { wide: 1.0, medium: 1.14, close: 1.34 };
   const emphSet = new Set(plan.emphasis);
+  /* ширина символа (в em) по шрифту: подгоняем размер БЕЗ измерения DOM (шрифты могут не успеть загрузиться) */
+  const CW = { V1: S.caps ? 0.82 : 0.66, V2: S.caps ? 0.98 : 0.8, V3: 0.6, V4: 0.74, V5: 0.64 }[S.id];
+  const fitSize = (base, maxChars, maxW, mult) => Math.max(36, Math.min(base, maxW / (Math.max(maxChars, 1) * CW * (mult || 1))));
 
   /* ---------- fake multi-camera: cam (кадрирование+наезд) > snap (резкий зум/вип) ---------- */
   const cam = $("cam"), snap = $("snap");
@@ -52,6 +55,10 @@
     const nextStart = ci + 1 < plan.chunks.length ? words[plan.chunks[ci + 1].first].start : DUR;
     const t1 = Math.min(nextStart, words[c.last].end + 0.45);
     const box = mk("div", "chunk", capLayer);
+    const toks = words.slice(c.first, c.last + 1).map((w) => tidy(w.w));
+    const lng = Math.max(...toks.map((x) => x.length));
+    const tot = toks.join(" ").length;
+    box.style.fontSize = Math.min(fitSize(S.cap_size, lng, 880, 1.28), fitSize(S.cap_size, tot / 2, 880, 1.1)) + "px";
     const spans = [];
     for (let i = c.first; i <= c.last; i++) {
       const emph = emphSet.has(i);
@@ -71,6 +78,12 @@
   const hookEl = $("hook");
   const hw = plan.hook.text.split(/\s+/);
   const T1 = plan.hook.t1;
+  const hookBase = S.hook_style === "slam" ? 150 : S.hook_style === "chrome3d" ? 140 : 110;
+  const hookMax = Math.max(...hw.map((x) => x.length));
+  let hookSize = fitSize(hookBase, hookMax, 880, 1);
+  if (S.hook_style === "slam") hookSize = Math.min(hookSize, 760 / (hw.length * 1.1));
+  else hookSize = Math.min(hookSize, fitSize(hookBase, hw.join(" ").length / 3, 880, 1));
+  hookEl.style.fontSize = hookSize + "px";
   const hookSpans = hw.map((w) => mk("span", "hw", hookEl, esc(S.caps ? w.toUpperCase() : w)));
   hookSpans.forEach((sp, i) => tl.set(sp, { opacity: 0 }, 0));
   const st = S.hook_style;

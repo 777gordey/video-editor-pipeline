@@ -39,27 +39,27 @@ STYLE_CSS = {
 .chunk{font-weight:900;-webkit-text-stroke:12px #000;paint-order:stroke fill;text-shadow:0 10px 0 rgba(0,0,0,.55)}
 .w.emph{font-size:1.28em}
 #hook.slam{flex-direction:column;align-items:center;top:210px}
-#hook.slam .hw{font-size:168px;line-height:1.02;color:#fff;-webkit-text-stroke:14px #000;paint-order:stroke fill;text-shadow:0 12px 0 rgba(0,0,0,.6)}
+#hook.slam .hw{font-size:1em;line-height:1.02;color:#fff;-webkit-text-stroke:14px #000;paint-order:stroke fill;text-shadow:0 12px 0 rgba(0,0,0,.6)}
 """,
     "V2": """
 .chunk{font-weight:900;text-shadow:0 0 14px var(--accent),0 0 34px var(--accent),0 6px 0 rgba(0,0,0,.5);-webkit-text-stroke:3px #1a0033;paint-order:stroke fill}
-#hook.glitch .hw{font-size:112px;color:#fff;text-shadow:5px 0 #ff2bd6,-5px 0 #00f5ff,0 0 38px #ff2bd6}
+#hook.glitch .hw{font-size:1em;color:#fff;text-shadow:5px 0 #ff2bd6,-5px 0 #00f5ff,0 0 38px #ff2bd6}
 """,
     "V3": """
 .chunk{font-weight:700;text-shadow:0 3px 18px rgba(0,0,0,.65),0 1px 0 rgba(0,0,0,.4);letter-spacing:.005em}
-#hook.editorial .hw{font-size:112px;font-weight:700;color:#F6EEDF;text-shadow:0 4px 30px rgba(0,0,0,.6)}
+#hook.editorial .hw{font-size:1em;font-weight:700;color:#F6EEDF;text-shadow:0 4px 30px rgba(0,0,0,.6)}
 #hook.editorial{flex-direction:column;align-items:center;top:300px}
 #hookrule{position:absolute;left:310px;top:640px;height:5px;width:0;background:var(--accent)}
 """,
     "V4": """
 .chunk{text-shadow:0 0 22px rgba(77,163,255,.7),0 6px 0 rgba(0,0,0,.6);-webkit-text-stroke:5px #05070D;paint-order:stroke fill;letter-spacing:.02em}
 #hook.chrome3d{top:230px}
-#hook.chrome3d .hw{position:relative;font-size:150px;color:#56627a;line-height:1.05;margin:0 14px}
+#hook.chrome3d .hw{position:relative;font-size:1em;color:#56627a;line-height:1.05;margin:0 14px}
 #hook.chrome3d .hw::after{content:attr(data-t);position:absolute;left:0;top:0;background:linear-gradient(180deg,#fff 0%,#cfd8e8 38%,#6c7b95 50%,#eef3fb 66%,#8795ae 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 """,
     "V5": """
 .chunk{background:rgba(255,255,255,.9);border-radius:64px;padding:22px 46px;box-shadow:0 14px 44px rgba(255,111,145,.35);font-weight:900;-webkit-text-stroke:0}
-#hook.pastel .hw{font-family:'Nunito';font-weight:900;font-size:100px;color:#4B3A5A;background:#fff;border-radius:64px;padding:6px 40px;margin:10px;box-shadow:0 14px 44px rgba(255,111,145,.4)}
+#hook.pastel .hw{font-family:'Nunito';font-weight:900;font-size:1em;color:#4B3A5A;background:#fff;border-radius:64px;padding:6px 40px;margin:10px;box-shadow:0 14px 44px rgba(255,111,145,.4)}
 """,
 }
 
