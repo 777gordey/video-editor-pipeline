@@ -93,12 +93,18 @@ def make_chunks(words, style, sents):
 def rule_emphasis(words, chunks):
     out, last_chunk = [], -9
     for ci, c in enumerate(chunks):
+        idx = range(c["first"], c["last"] + 1)
+        strong = [k for k in idx if NUM_RX.search(norm(words[k]["w"])) or MONEY_RX.search(norm(words[k]["w"]))
+                  or PAIN_RX.search(norm(words[k]["w"]))]
+        if strong:                                  # цифры, деньги, боль — акцент всегда
+            out.append(strong[0])
+            last_chunk = ci
+            continue
         if ci - last_chunk < 3:
             continue
-        cand = [k for k in range(c["first"], c["last"] + 1)
-                if (len(norm(words[k]["w"])) >= 7 and norm(words[k]["w"]) not in STOP) or re.search(r"\d", words[k]["w"])]
+        cand = [k for k in idx if len(norm(words[k]["w"])) >= 7 and norm(words[k]["w"]) not in STOP]
         if cand:
-            out.append(max(cand, key=lambda k: (bool(re.search(r"\d", words[k]["w"])), len(norm(words[k]["w"])))))
+            out.append(max(cand, key=lambda k: len(norm(words[k]["w"]))))
             last_chunk = ci
     return out
 
@@ -231,22 +237,83 @@ def make_sfx(plan, style, words):
 
 
 # ------------------------------------------------------------------- hook / LLM
-def rule_hook(words, sents, vidx):
-    cand = []
-    for s in sents[: max(3, int(len(sents) * 0.7))]:
-        n = s["last"] - s["first"] + 1
-        txt = s["text"]
-        sc = (2 if re.search(r"\d", txt) else 0) + (1.5 if "?" in txt else 0) + (1 if 3 <= n <= 8 else 0) - 0.02 * s["id"]
-        cand.append((sc, s))
-    cand.sort(key=lambda x: -x[0])
-    s = cand[vidx % len(cand)][1]
-    first = s["first"]
-    last = min(s["last"], first + 5)
-    return first, last
+NUM_RX = re.compile(r"\d|тысяч|миллион|миллиард|процент|рубл|доллар|евро|сотн|\$|₽|%")
+MONEY_RX = re.compile(r"деньг|доход|заработ|прибыл|рубл|доллар|бюджет|цен[аыуе]|стоим|оплат|инвест")
+PAIN_RX = re.compile(r"ошибк|проблем|потер|теряе|провал|никогда|ничего|нельзя|не получ|не смож|боль|страх|слив|неудач|трудн|сложн|мешает|причин|враг|обман")
+CLAIM_RX = re.compile(r"секрет|главн|единственн|только|всегда|любой|каждый|важн|навык|правд|на самом деле|запомни|понима|научи")
+WEAK_START = {"и", "а", "но", "что", "как", "в", "на", "с", "к", "у", "о", "по", "за", "из", "от", "до", "я", "ну", "вот", "это", "то", "же", "ли"}
+WEAK_END = {"и", "а", "но", "что", "как", "в", "на", "с", "к", "у", "о", "по", "за", "из", "от", "до", "не", "же", "ли", "бы", "то", "который", "которым"}
+FILLERS = {"э", "эм", "ну", "типа", "короче", "как", "бы"}
+# углы подачи: веса признаков (num, money, pain, claim, question, you)
+ANGLES = {
+    "V1": dict(claim=1.6, pain=1.0, num=1.2, money=0.8, question=0.2, you=0.4),     # самое сильное утверждение
+    "V2": dict(question=2.0, pain=1.8, you=1.0, claim=0.6, num=0.6, money=0.4),     # боль / вопрос зрителю
+    "V3": dict(num=2.2, money=1.6, claim=1.0, pain=0.4, question=0.2, you=0.2),     # цифра / факт
+    "V4": dict(claim=1.8, money=1.0, num=0.8, pain=0.6, question=0.2, you=0.2),     # смелый тезис
+    "V5": dict(you=1.8, claim=1.0, pain=0.6, question=0.8, num=0.4, money=0.4),     # личное обращение
+}
+
+
+def _hook_candidates(words, sents, horizon=15.0):
+    """Окна по 3-6 слов внутри предложений первых ~15 с (если слов мало — расширяем до всего клипа)."""
+    out = []
+    pool = [s for s in sents if words[s["first"]]["start"] < horizon] or sents[:3]
+    for s in pool:
+        for i in range(s["first"], s["last"] + 1):
+            if i > s["first"] and not re.search(r"[,;:]$", words[i - 1]["w"]):
+                continue                              # окно начинается с начала предложения или клаузы
+            for n in range(3, 7):
+                j = i + n - 1
+                if j > s["last"]:
+                    break
+                ws = [norm(words[k]["w"]) for k in range(i, j + 1)]
+                if ws[0] in WEAK_START or (ws[-1] in WEAK_END and not re.search(r"[,;:.!?…]$", words[j]["w"])) or any(x in FILLERS for x in ws):
+                    continue
+                if words[j]["end"] - words[i]["start"] > 3.6:
+                    continue
+                txt = " ".join(ws)
+                raw = " ".join(words[k]["w"] for k in range(i, j + 1))
+                f = dict(num=1.0 if NUM_RX.search(txt) else 0.0, money=1.0 if MONEY_RX.search(txt) else 0.0,
+                         pain=1.0 if PAIN_RX.search(txt) else 0.0, claim=1.0 if CLAIM_RX.search(txt) else 0.0,
+                         question=1.0 if "?" in raw or ws[0] in ("почему", "как", "зачем", "что", "сколько", "кто") else 0.0,
+                         you=1.0 if re.search(r"ты|тебе|тебя|вы|вам|твой|ваш", txt) else 0.0)
+                # слова-«мясо» (длинные) и конец на границе предложения/запятой — лучше
+                body = sum(1 for x in ws if len(x) >= 5) / n
+                tidy_end = 1.3 if (j == s["last"] or re.search(r"[,;:.!?…]$", words[j]["w"])) else 0.0
+                out.append(dict(first=i, last=j, f=f, base=body * 0.8 + tidy_end - 0.015 * (i - s["first"]) - 0.01 * i))
+    return out
+
+
+def _pick(ver, cands, used):
+    wts = ANGLES[ver]
+
+    def score(c):
+        sc = c["base"] + sum(wts[k] * v for k, v in c["f"].items())
+        for (uf, ul) in used:                       # у каждой версии свой угол: не повторять чужие окна
+            if not (c["last"] < uf or c["first"] > ul):
+                sc -= 2.5
+        return sc
+    return max(cands, key=score)
+
+
+def rule_hook(words, sents, vidx, used=None):
+    """Хук ≤6 слов из самого сильного утверждения/цифры/боли в первых ~15 с; угол зависит от версии.
+    Версии выбирают по порядку V1..V5, пересекающиеся окна штрафуются — получается разный хук."""
+    cands = _hook_candidates(words, sents)
+    if not cands:
+        s = sents[0]
+        return s["first"], min(s["last"], s["first"] + 5)
+    vers = list(STYLES)
+    used = []
+    for k in range(vidx + 1):
+        best = _pick(vers[k], cands, used)
+        used.append((best["first"], best["last"]))
+    return best["first"], best["last"]
 
 
 def clean_hook_text(words, first, last):
     t = " ".join(w["w"] for w in words[first:last + 1])
+    t = re.sub(r"\s+-", "-", t)                     # «По -другому» -> «По-другому»
     return re.sub(r"[,;:.]+$", "", t).strip()
 
 

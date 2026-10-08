@@ -5,6 +5,7 @@
 import json
 import re
 import subprocess
+from pathlib import Path
 
 import numpy as np
 
@@ -182,8 +183,35 @@ def mix(voice_media, music, amb, sfx, style, out_wav):
     if p1.returncode != 0 or not m:
         raise RuntimeError("loudnorm pass1 failed: " + p1.stderr[-400:])
     j = json.loads(m.group(0))
-    ln = (f"loudnorm=I={LUFS}:TP=-1.5:LRA=11:measured_I={j['input_i']}:measured_LRA={j['input_lra']}:"
-          f"measured_TP={j['input_tp']}:measured_thresh={j['input_thresh']}:offset={j['target_offset']}:linear=true")
+    # линейное усиление до цели + мягкий лимитер на -1.5 dBFS (loudnorm linear упирался в пики голоса и давал -15 LUFS)
+    gain = LUFS - float(j["input_i"])
+    ln = f"volume={gain:.2f}dB,alimiter=limit=0.84:attack=3:release=60:level=disabled"
     run(["ffmpeg", "-y", "-loglevel", "error", *ins, "-filter_complex", chain + f",{ln},aresample={SR}[o]",
          "-map", "[o]", "-ac", 2, "-ar", SR, out_wav])
     log(f"[audio] loudnorm pass1 input_i={j['input_i']} -> target {LUFS} LUFS")
+
+
+def duck_stats(voice_media, music, style, words, out_json):
+    """Насколько музыка тише голоса ВО ВРЕМЯ речи (после sidechain). Пишет duck json."""
+    import numpy as np
+    g = style["music_gain_db"]
+    def pcm(args):
+        p = subprocess.run(["ffmpeg", "-v", "error", *args, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True)
+        return np.frombuffer(p.stdout, np.int16).astype(np.float32) / 32768.0
+    v = pcm(["-i", str(voice_media), "-vn"])
+    md = pcm(["-i", str(voice_media), "-i", str(music), "-filter_complex",
+              f"[0:a]asplit=2[v1][v2];[1:a]volume={g}dB[m0];[m0][v2]sidechaincompress=threshold=0.03:ratio=9:attack=12:release=450[md]",
+              "-map", "[md]"])
+    n = min(len(v), len(md))
+    vr, mr = [], []
+    for w in words:
+        a, b = int(w["start"] * 16000), int(w["end"] * 16000)
+        if b - a > 800 and b <= n:
+            vr.append(float(np.sqrt((v[a:b] ** 2).mean() + 1e-12)))
+            mr.append(float(np.sqrt((md[a:b] ** 2).mean() + 1e-12)))
+    if not vr:
+        return None
+    res = {"voice_db": round(20 * np.log10(np.median(vr)), 1), "music_under_speech_db": round(20 * np.log10(np.median(mr)), 1)}
+    res["margin_db"] = round(res["voice_db"] - res["music_under_speech_db"], 1)
+    Path(out_json).write_text(json.dumps(res), encoding="utf-8")
+    return res

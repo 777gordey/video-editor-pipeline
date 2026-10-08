@@ -109,7 +109,7 @@ video.layer{{object-fit:cover}}
 #cam,#snap,#scene{{position:absolute;left:0;top:0;width:{W}px;height:{H}px;transform-origin:50% 38%}}
 #scene{{isolation:isolate;overflow:hidden}}
 #inv{{mix-blend-mode:multiply}} #pb{{mix-blend-mode:screen}}
-#captions{{position:absolute;left:60px;top:1170px;width:960px;height:420px}}
+#captions{{position:absolute;left:60px;top:1330px;width:960px;height:300px}}
 .chunk{{position:absolute;left:0;top:50%;width:100%;transform:translateY(-50%);opacity:0;text-align:center;
   font-family:'{style['font']}',sans-serif;font-weight:{style['font_weight']};font-size:{style['cap_size']}px;line-height:1.08;
   color:var(--text);{'text-transform:uppercase;' if style['caps'] else ''}word-spacing:.05em}}

@@ -60,9 +60,11 @@
     const tot = toks.join(" ").length;
     box.style.fontSize = Math.min(fitSize(S.cap_size, lng, 860, 1.3), fitSize(S.cap_size, tot / 2, 860, 1.15)) + "px";
     const spans = [];
+    const capFs = parseFloat(box.style.fontSize);
     for (let i = c.first; i <= c.last; i++) {
       const emph = emphSet.has(i);
       const sp = mk("span", "w" + (emph ? " emph" : ""), box, esc(tidy(words[i].w)));
+      if (emph) sp.style.margin = "0 " + Math.round(0.11 * tidy(words[i].w).length * CW * capFs + 0.14 * capFs) + "px";   // scale 1.22 не должен наезжать на соседей
       spans.push([sp, words[i].start, emph]);
     }
     tl.set(box, { opacity: 1 }, t0);

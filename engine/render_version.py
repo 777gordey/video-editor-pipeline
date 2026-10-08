@@ -57,6 +57,7 @@ def main():
     ap.add_argument("--workers", default=os.environ.get("HF_WORKERS", "4"))
     ap.add_argument("--quality", default="standard")
     ap.add_argument("--no-matte", action="store_true")
+    ap.add_argument("--alpha", default=None, help="готовая alpha_small.mkv (общая для всех версий)")
     a = ap.parse_args()
     v = a.version
     style = STYLES[v]
@@ -83,6 +84,10 @@ def main():
         audio.build_ambience(style["ambience"], dur, amb)
         mixwav = work / "mix.wav"
         audio.mix(prepped, music, amb, sfx, style, mixwav)
+        try:
+            log("[duck]", audio.duck_stats(prepped, music, style, tr["words"], out / f"duck_{v}.json"))
+        except Exception as e:  # noqa
+            log(f"[duck] stats skipped: {e}")
 
     proj = work / "proj"
     layers = {}
@@ -104,6 +109,9 @@ def main():
         def do_matte():
             if not (style["bg"] != "room" and style["matte"] and not a.no_matte):
                 return None
+            if a.alpha and Path(a.alpha).exists():
+                log(f"[matte] using shared alpha {a.alpha}")
+                return Path(a.alpha)
             t0 = time.time()
             alpha = work / "alpha_small.mkv"
             matte_mod.matte(prepped, alpha, work / "rvm.onnx")
