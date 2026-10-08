@@ -164,6 +164,17 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
+          name: debug-${{ matrix.version }}
+          path: |
+            out/debug_*.jpg
+            out/plan_*.json
+            out/timings_*.json
+          retention-days: 1
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
           name: version-${{ matrix.version }}
           path: |
             out/final_*.mp4
