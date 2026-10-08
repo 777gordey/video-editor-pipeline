@@ -20,7 +20,7 @@ import numpy as np
 from common import FPS, W, H, log, run
 
 MODEL_URL = "https://github.com/PeterL1n/RobustVideoMatting/releases/download/v1.0.0/rvm_mobilenetv3_fp32.onnx"
-MODEL_SHA256 = os.environ.get("RVM_SHA256", "")   # закрепляется после первого прогона (см. лог)
+MODEL_SHA256 = os.environ.get("RVM_SHA256", "88d4531297118f595bf2fd60f6f566aec2e559393802d1f436c380f0cbbd2828")
 MW, MH = 540, 960
 DOWNSAMPLE = 0.5
 
