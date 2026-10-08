@@ -36,6 +36,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Pexels key check (status code only)
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" -H "Authorization: $PEXELS_API_KEY" "https://api.pexels.com/videos/search?query=forest&per_page=1")
+          echo "Pexels API status: $code"
+
       - name: Pick versions
         id: v
         env:
