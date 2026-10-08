@@ -141,9 +141,10 @@ video.layer{{object-fit:cover}}
   <div id="flash"></div>
 </div>
 <script>window.PLAN_DATA = {json.dumps(data, ensure_ascii=False)};</script>
-<script src="runtime.js"></script>
+<script>RUNTIME_JS</script>
 </body></html>"""
     # data-t для объёмного (chrome3d) текста хука
-    html = html.replace('<script src="runtime.js"></script>',
-                        '<script src="runtime.js"></script>\n<script>document.querySelectorAll("#hook .hw").forEach(e=>e.setAttribute("data-t",e.textContent));</script>')
+    rt = (STATIC / "runtime.js").read_text(encoding="utf-8")
+    tail = 'document.querySelectorAll("#hook .hw").forEach(e=>e.setAttribute("data-t",e.textContent));'
+    html = html.replace("RUNTIME_JS", rt + chr(10) + tail)
     (proj / "index.html").write_text(html, encoding="utf-8")
