@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """plan.json для одной версии из РЕАЛЬНЫХ слов автора.
 
-LLM (через scripts/openai_http.py) выбирает только: хук (<=6 слов подряд из
-транскрипта), слова-акценты, триггеры графики. Всё остальное (раскадровка
-камер, SFX, чанки субтитров) строит код детерминированно, привязывая события к
-началам слов. Если баланс OpenAI пуст / вызов упал / ответ не прошёл схему —
-правила и громкая строка "PLAN FALLBACK: <причина>".
+Выборы (хук <=6 слов подряд из транскрипта, слова-акценты, триггеры графики,
+доп. SFX-точки) приходят из ОДНОГО вызова Claude Code (plan_claude.py ->
+plans.json на все 5 версий). Всё остальное (раскадровка камер, SFX, чанки
+субтитров) строит код детерминированно, привязывая события к началам слов.
+Нет выборов / ответ не прошёл схему — правила и громкая строка
+"PLAN FALLBACK: <причина>".
 """
 import argparse
 import json
@@ -27,7 +28,7 @@ PLAN_SCHEMA = {
     "required": ["version", "source", "duration", "hook", "emphasis", "chunks", "cams", "snaps", "graphics", "sfx"],
     "properties": {
         "version": {"enum": list(STYLES)},
-        "source": {"enum": ["llm", "rules"]},
+        "source": {"enum": ["claude", "rules"]},
         "fallback_reason": {"type": "string"},
         "duration": {"type": "number", "exclusiveMinimum": 0},
         "hook": {
@@ -249,37 +250,15 @@ def clean_hook_text(words, first, last):
     return re.sub(r"[,;:.]+$", "", t).strip()
 
 
-def llm_choices(version, style, words, sents, dur):
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        raise RuntimeError("no OPENAI_API_KEY")
-    from openai_http import openai_post
-    listing = "\n".join(
-        f"[{s['id']}] " + " ".join(f"{k}:{words[k]['w']}" for k in range(s["first"], s["last"] + 1)) for s in sents)
-    max_g = max(1, int(dur / 8 * style["graphics_density"]))
-    prompt = f"""Ты монтажёр коротких вертикальных видео. Ниже транскрипт речи автора (формат idx:слово по предложениям).
-Стиль версии {version} «{style['name']}». Угол хука: {style['angle']}
-
-Верни СТРОГО JSON без пояснений:
-{{"hook":{{"first":int,"last":int}},
- "emphasis":[idx,...],
- "graphics":[{{"word":idx,"kind":"globe|circle|icon","icon":"{'|'.join(ICONS)}","num":1,"text":"до 3 слов"}}]}}
-
-Правила:
-- hook: подряд идущие слова ИЗ ТРАНСКРИПТА, не больше 6 слов (last-first<=5), должны звучать как цепляющий заголовок под этот угол. Слова не менять.
-- emphasis: ключевые слова для выделения в субтитрах, примерно каждое 8-е слово, idx из транскрипта.
-- graphics: не больше {max_g} штук, только где слово реально про это: globe — мир/страны/интернет/масштаб; circle — перечисление (num = номер пункта); icon — деньги/скорость/время/риск/результат/и т.п. word = idx слова-триггера. Если уместных мест нет — пустой список.
-
-Транскрипт:
-{listing}"""
-    resp = openai_post({"model": "gpt-5.6-luna", "input": prompt}, key, timeout=90)
-    body = resp.json()
-    txt = "".join(c["text"] for it in body["output"] if it.get("type") == "message"
-                  for c in it["content"] if c.get("type") == "output_text")
-    m = re.search(r"\{.*\}", txt, re.S)
-    if not m:
-        raise ValueError("LLM returned no JSON")
-    return json.loads(m.group(0))
+def get_choices(version, choices):
+    """choices: dict из plans.json (все версии) или None."""
+    if not choices:
+        raise RuntimeError("plans.json отсутствует")
+    if "_fallback" in choices:
+        raise RuntimeError(str(choices["_fallback"])[:200])
+    if version not in choices:
+        raise RuntimeError(f"в plans.json нет {version}")
+    return choices[version]
 
 
 def semantic_check(plan, n_words):
@@ -297,15 +276,15 @@ def semantic_check(plan, n_words):
 
 
 # ------------------------------------------------------------------------- main
-def build_plan(version, tr, force_rules=False, beats=None):
+def build_plan(version, tr, choices=None, force_rules=False, beats=None):
     style = STYLES[version]
     words, sents, dur = tr["words"], tr["sentences"], tr["duration"]
     vidx = list(STYLES).index(version)
-    source, reason = "llm", None
+    source, reason = "claude", None
     try:
         if force_rules:
-            raise RuntimeError("forced rules (--rules)")
-        ch = llm_choices(version, style, words, sents, dur)
+            raise RuntimeError("forced rules (validation)")
+        ch = get_choices(version, choices)
         hf, hl = int(ch["hook"]["first"]), int(ch["hook"]["last"])
         emph = sorted({int(i) for i in ch.get("emphasis", []) if 0 <= int(i) < len(words)})
         gcand = []
@@ -338,13 +317,21 @@ def build_plan(version, tr, force_rules=False, beats=None):
     plan["snaps"] = make_snaps(words, emph, style, plan["cams"])
     plan["graphics"] = place_graphics(gcand, words, style, dur)
     plan["sfx"] = make_sfx(plan, style, words)
+    for e in (ch.get("sfx", []) if source == "claude" else []):    # доп. точки от Claude
+        try:
+            k = int(e["word"])
+            if 0 <= k < len(words) and e["kind"] in ("hit", "whoosh", "pop", "riser", "click"):
+                plan["sfx"].append({"t": round(words[k]["start"], 3), "kind": e["kind"], "gain": round(0.7 * style["sfx_level"], 2)})
+        except (KeyError, ValueError, TypeError):
+            pass
+    plan["sfx"].sort(key=lambda x: x["t"])
     try:
         validate(plan, PLAN_SCHEMA)
         semantic_check(plan, len(words))
     except (ValidationError, ValueError) as e:
-        if source == "llm":      # LLM-ответ испортил план — откат на правила, не молча
+        if source == "claude":   # ответ Claude испортил план — откат на правила, не молча
             print(f"PLAN FALLBACK: validation: {str(e)[:200]}", flush=True)
-            return build_plan(version, tr, force_rules=True, beats=beats)
+            return build_plan(version, tr, choices, force_rules=True, beats=beats)
         raise
     return plan
 
@@ -353,10 +340,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("version", choices=list(STYLES))
     ap.add_argument("--transcript", default="out/transcript.json")
+    ap.add_argument("--plans", default=None, help="plans.json от plan_claude.py")
     ap.add_argument("--out", default="out")
     ap.add_argument("--rules", action="store_true")
     a = ap.parse_args()
-    plan = build_plan(a.version, load_json(a.transcript), a.rules)
+    ch = load_json(a.plans) if a.plans and Path(a.plans).exists() else None
+    plan = build_plan(a.version, load_json(a.transcript), ch, a.rules)
     Path(a.out).mkdir(parents=True, exist_ok=True)
     save_json(Path(a.out) / f"plan_{a.version}.json", plan)
     log(f"[plan {a.version}] source={plan['source']} hook=«{plan['hook']['text']}» "

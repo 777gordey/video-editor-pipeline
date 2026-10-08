@@ -6,7 +6,6 @@ from pathlib import Path
 
 ENGINE_DIR = Path(__file__).resolve().parent
 REPO_DIR = ENGINE_DIR.parent
-sys.path.insert(0, str(REPO_DIR / "scripts"))   # openai_http.py лежит там
 
 CONFIG = json.loads((ENGINE_DIR / "config.json").read_text(encoding="utf-8"))
 SPEED = float(CONFIG["SPEED"])          # единственная настройка скорости

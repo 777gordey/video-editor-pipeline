@@ -73,7 +73,8 @@ def main():
         music = work / "music.wav"
         msrc, beats = audio.prepare_music(style, dur, music)
         log(f"[audio] music={msrc} beats={len(beats)}")
-        pl = plan_mod.build_plan(v, tr, beats=beats)
+        pj = prep / "plans.json"
+        pl = plan_mod.build_plan(v, tr, load_json(pj) if pj.exists() else None, beats=beats)
         save_json(out / f"plan_{v}.json", pl)
         log(f"[plan {v}] source={pl['source']} hook=«{pl['hook']['text']}» cams={len(pl['cams'])} "
             f"snaps={len(pl['snaps'])} graphics={len(pl['graphics'])} sfx={len(pl['sfx'])}")

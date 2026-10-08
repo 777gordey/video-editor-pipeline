@@ -4,7 +4,7 @@
 1. нормализация: CFR 30 fps, 1080x1920, SDR (bt709), 48 кГц
 2. транскрипция faster-whisper (ru, пословные таймстампы)
 3. авто-нарезка: паузы >0.4 c, слова-паразиты, ложные старты, повторы дублей,
-   явный оффтоп (LLM, при сомнении оставляем) -> out/cuts.md
+    -> out/cuts.md
 4. ускорение SPEED (видео+звук, тон сохраняется), времена слов / SPEED
 
 Выход (в --out): prepped.mp4, transcript.json (времена уже на ФИНАЛЬНОЙ
@@ -172,42 +172,6 @@ def detect_drops(words, sents):
     return drop
 
 
-def llm_offtopic(words, sents):
-    """Оффтоп через LLM. При любой неудаче — ничего не режем (когда не уверены, оставляем)."""
-    key = os.environ.get("OPENAI_API_KEY")
-    if not key:
-        log("[prep] OFFTOPIC SKIPPED: no OPENAI_API_KEY")
-        return {}
-    try:
-        from openai_http import openai_post
-        lines = [f"{k}: " + " ".join(words[i]["w"] for i in s) for k, s in enumerate(sents)]
-        prompt = (
-            "Это транскрипт короткого видео автора (говорящая голова). Найди предложения, которые "
-            "ЯВНО не относятся к теме ролика: реплики не в камеру, бытовые отвлечения, разговор с "
-            "кем-то за кадром, технические паузы ('подожди', 'сейчас включу'). Если есть сомнение — "
-            "НЕ включай. Ответ строго JSON: {\"drop\":[{\"id\":N,\"reason\":\"...\"}]}. "
-            "Если таких нет: {\"drop\":[]}.\n\n" + "\n".join(lines))
-        resp = openai_post({"model": "gpt-5.6-luna", "input": prompt}, key, timeout=90)
-        body = resp.json()
-        txt = "".join(c["text"] for it in body["output"] if it.get("type") == "message"
-                      for c in it["content"] if c.get("type") == "output_text")
-        data = json.loads(re.search(r"\{.*\}", txt, re.S).group(0))
-        out = {}
-        for d in data.get("drop", []):
-            k = int(d["id"])
-            if 0 <= k < len(sents) and len(sents) > 3:
-                for i in sents[k]:
-                    out[i] = ("off_topic", str(d.get("reason", ""))[:80])
-        # страховка: не режем больше 25% слов по оффтопу
-        if len(out) > 0.25 * len(words):
-            log("[prep] OFFTOPIC SKIPPED: LLM wanted to drop >25% — не доверяю")
-            return {}
-        return out
-    except Exception as e:  # noqa
-        log(f"[prep] OFFTOPIC SKIPPED: {type(e).__name__}: {str(e)[:160]}")
-        return {}
-
-
 def build_segments(words, drop, total):
     keep = [i for i in range(len(words)) if i not in drop]
     if not keep:
@@ -302,6 +266,8 @@ def write_cuts_md(path, words, drop, segs, pauses, src_dur, final_dur):
         for i, (_, why) in items:
             L.append(f"- {fmt(words[i]['start'])}  {why}")
         L.append("")
+    L.append("_Оффтоп: автоматически не определяется (при сомнении оставляем весь материал)._")
+    L.append("")
     L.append("## Мёртвые паузы (время в исходнике)")
     for a, b, d in pauses:
         L.append(f"- {fmt(a)} → {fmt(b)}  ({b - a:.2f} с){' + вырезанные слова' if d else ''}")
@@ -326,8 +292,6 @@ def main():
         raise SystemExit("[prep] в видео почти нет речи")
     sents = split_sentences(words)
     drop = detect_drops(words, sents)
-    for i, v in llm_offtopic(words, sents).items():
-        drop.setdefault(i, v)
     segs, pauses = build_segments(words, drop, total)
     log(f"[prep] drop={len(drop)} segments={len(segs)} pauses={len(pauses)}")
 
