@@ -1,0 +1,14 @@
+# Stub: registers the workflow name on the default branch so it can be dispatched with --ref engine-v2.
+# The real definition lives on branch engine-v2 and is used when run from that ref.
+name: Edit video v2
+on:
+  workflow_dispatch:
+    inputs:
+      video_url: { required: false, default: "" }
+      versions: { required: false, default: "V1,V2,V3,V4,V5" }
+      whisper: { required: false, default: "large-v3" }
+jobs:
+  stub:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Run this workflow with --ref engine-v2"
