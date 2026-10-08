@@ -67,9 +67,10 @@ jobs:
         env:
           VIDEO_URL: ${{ github.event.client_payload.video_url || github.event.inputs.video_url || secrets.TEST_VIDEO_URL }}
         run: |
-          echo "::add-mask::$VIDEO_URL"
+          [ "$VIDEO_URL" = "selftest" ] || echo "::add-mask::$VIDEO_URL"
           test -n "$VIDEO_URL" || { echo "no video url"; exit 1; }
-          curl -sS -f -L --retry 3 "$VIDEO_URL" -o source.mp4
+          if [ "$VIDEO_URL" = "selftest" ]; then bash engine/selftest.sh source.mp4; else
+            curl -sS -f -L --retry 3 "$VIDEO_URL" -o source.mp4; fi
           test -s source.mp4
           ls -la source.mp4
 
