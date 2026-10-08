@@ -248,6 +248,34 @@ def sentences_final(fw):
              "text": " ".join(fw[k]["w"] for k in s)} for n, s in enumerate(sents)]
 
 
+def remap_plans(data, fw, n_raw):
+    """plans (индексы СЫРЫХ слов) -> индексы слов финального транскрипта; вырезанные слова пропускаем."""
+    import bisect
+    src = [w["src"] for w in fw]                       # возрастающие индексы оставленных сырых слов
+    pos = {s_: k for k, s_ in enumerate(src)}
+
+    def nxt(x):
+        k = bisect.bisect_left(src, x)
+        return min(k, len(fw) - 1)
+
+    def prv(x):
+        k = bisect.bisect_right(src, x) - 1
+        return max(k, 0)
+    out = {}
+    for v, ch in data.items():
+        if v.startswith("_") or v == "cuts":
+            continue
+        hf, hl = nxt(ch["hook"]["first"]), prv(ch["hook"]["last"])
+        if hl < hf:
+            hl = hf
+        hl = min(hl, hf + 5)
+        out[v] = {"hook": {"first": hf, "last": hl},
+                  "emphasis": sorted({pos[i] for i in ch["emphasis"] if i in pos}),
+                  "graphics": [{**g, "word": pos[g["word"]]} for g in ch["graphics"] if g["word"] in pos],
+                  "sfx": [{**e, "word": pos[e["word"]]} for e in ch["sfx"] if e["word"] in pos]}
+    return out
+
+
 def fmt(t):
     return f"{int(t // 60)}:{t % 60:05.2f}"
 
@@ -266,7 +294,8 @@ def write_cuts_md(path, words, drop, segs, pauses, src_dur, final_dur):
         for i, (_, why) in items:
             L.append(f"- {fmt(words[i]['start'])}  {why}")
         L.append("")
-    L.append("_Оффтоп: автоматически не определяется (при сомнении оставляем весь материал)._")
+    L.append("_Оффтоп и смысловые вырезы предлагает Claude-планировщик (при сомнении оставляем материал); "
+             "без токена Claude работают только правила: паузы, паразиты, запинки, дубли._")
     L.append("")
     L.append("## Мёртвые паузы (время в исходнике)")
     for a, b, d in pauses:
@@ -292,6 +321,24 @@ def main():
         raise SystemExit("[prep] в видео почти нет речи")
     sents = split_sentences(words)
     drop = detect_drops(words, sents)
+    raw_plans = None
+    if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):          # один вызов Claude: выборы всех версий + вырезы по смыслу
+        import plan_claude
+        raw_plans = plan_claude.plan_raw(words, [s_ for s_ in sents], drop, total)
+        if "_fallback" not in raw_plans:
+            extra = {}
+            for c_ in raw_plans.get("cuts", []):
+                for k in range(c_["first"], c_["last"] + 1):
+                    if k not in drop:
+                        extra[k] = (c_["cat"], "Claude: " + (c_.get("why") or c_["cat"]))
+            if len(extra) > 0.25 * len(words):
+                print(f"PLAN FALLBACK: cuts: Claude предложил вырезать {len(extra)} из {len(words)} слов — слишком много, "
+                      f"вырезы Claude не применяются", flush=True)
+            else:
+                drop.update(extra)
+                log(f"[prep] Claude cuts applied: {len(extra)} words")
+    else:
+        print("PLAN FALLBACK: CLAUDE_CODE_OAUTH_TOKEN не задан", flush=True)
     segs, pauses = build_segments(words, drop, total)
     log(f"[prep] drop={len(drop)} segments={len(segs)} pauses={len(pauses)}")
 
@@ -302,6 +349,17 @@ def main():
     log(f"[prep] final duration planned={fdur:.2f}s actual={real:.2f}s speed={SPEED}")
     save_json(out / "transcript.json", {"speed": SPEED, "duration": real, "words": fw,
                                          "sentences": sentences_final(fw)})
+    if raw_plans is not None:
+        if "_fallback" in raw_plans:
+            save_json(out / "plans.json", raw_plans)
+        else:
+            try:
+                save_json(out / "plans.json", remap_plans(raw_plans, fw, len(words)))
+            except Exception as e:  # noqa
+                print(f"PLAN FALLBACK: remap: {type(e).__name__}: {str(e)[:200]}", flush=True)
+                save_json(out / "plans.json", {"_fallback": f"remap: {e}"})
+    else:
+        save_json(out / "plans.json", {"_fallback": "CLAUDE_CODE_OAUTH_TOKEN не задан"})
     write_cuts_md(out / "cuts.md", words, drop, segs, pauses, total, real)
     norm_mp4.unlink()
     (out / "prepped.filter.txt").unlink(missing_ok=True)

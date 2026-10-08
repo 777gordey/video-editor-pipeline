@@ -153,7 +153,7 @@ def main():
         final = out / f"final_{v}.mp4"
         grain = {"V1": 5, "V2": 6, "V3": 9, "V4": 5, "V5": 3}[v]
         run(["ffmpeg", "-y", "-loglevel", "error", "-i", raw, "-i", mixwav, "-map", "0:v:0", "-map", "1:a:0",
-             "-vf", f"noise=alls={grain}:allf=t+u,format=yuv420p", "-c:v", "libx264", "-preset", "medium", "-crf", 17,
+             "-vf", f"noise=alls={grain}:allf=t+u,format=yuv420p", "-c:v", "libx264", "-preset", "medium", "-crf", 19, "-maxrate", "9M", "-bufsize", "18M",
              "-r", FPS, "-c:a", "aac", "-b:a", "192k", "-ar", 48000, "-movflags", "+faststart",
              "-t", f"{dur:.3f}", final])
         fd = duration(final)

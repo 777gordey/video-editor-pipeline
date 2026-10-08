@@ -44,7 +44,13 @@ VERSION_SCHEMA = {
                            "kind": {"enum": ["hit", "whoosh", "pop", "riser", "click"]}}}},
     },
 }
-PLANS_SCHEMA = {"type": "object", "required": list(STYLES), "properties": {v: VERSION_SCHEMA for v in STYLES}}
+CUT_CATS = ["filler", "false_start", "repeat_take", "off_topic"]
+CUTS_SCHEMA = {"type": "array", "maxItems": 40, "items": {
+    "type": "object", "required": ["first", "last", "cat"],
+    "properties": {"first": {"type": "integer", "minimum": 0}, "last": {"type": "integer", "minimum": 0},
+                   "cat": {"enum": CUT_CATS}, "why": {"type": "string", "maxLength": 120}}}}
+PLANS_SCHEMA = {"type": "object", "required": list(STYLES),
+                "properties": {**{v: VERSION_SCHEMA for v in STYLES}, "cuts": CUTS_SCHEMA}}
 
 
 def scrub(text: str) -> str:
@@ -53,12 +59,22 @@ def scrub(text: str) -> str:
     return text.replace(tok, "<token>") if tok else text
 
 
-def build_prompt(tr) -> str:
+CUTS_PROMPT = """
+Дополнительно верни ключ cuts — список вырезов по транскрипту (слова, помеченные ~k:слово~, УЖЕ вырезаны автоматически —
+не включай их и не используй в хуках/акцентах). Вырезай ТОЛЬКО то, в чём уверен:
+- filler: слова-паразиты (э, эм, ну, типа, как бы, короче), если они не несут смысла;
+- false_start: оборванные фразы и повторы-запинки (оставить нужно чистую версию);
+- repeat_take: повторные дубли одной мысли (оставить лучший, обычно последний);
+- off_topic: куски, не относящиеся к теме ролика (реплики в сторону, посторонние разговоры).
+Каждый вырез: {first,last,cat,why} по idx слов. Если сомневаешься — НЕ вырезай. Не вырезай больше ~20% слов.
+Хуки, акценты, графику и sfx выбирай только из слов, которые остаются."""
+
+
+def build_prompt(tr, with_cuts=False) -> str:
     briefs = "\n".join(f"- {v}: «{s['name']}», угол хука: {s['angle']}; плотность графики {s['graphics_density']}; "
                        f"SFX-уровень {s['sfx_level']}" for v, s in STYLES.items())
     dur = tr["duration"]
-    return f"""Ты монтажёр коротких вертикальных видео. В файле words.txt — транскрипт речи автора (после нарезки и
-ускорения), по предложениям, формат `idx:слово`. Длительность клипа {dur:.0f} с.
+    return f"""Ты монтажёр коротких вертикальных видео. В файле words.txt — транскрипт речи автора ({'СЫРОЙ, до нарезки' if with_cuts else 'после нарезки и ускорения'}), по предложениям, формат `idx:слово`. Длительность клипа {dur:.0f} с.
 
 Нужно составить выборы для ПЯТИ версий ролика и записать их ОДНИМ JSON-файлом plans.json (инструмент Write) в текущей
 папке; тот же объект верни и как итоговый structured output. Версии:
@@ -73,19 +89,22 @@ def build_prompt(tr) -> str:
   Не больше (длительность/8 * плотность) штук на версию, только там, где слово реально про это; можно пусто.
 - sfx: дополнительные звуковые акценты {{word, kind}} (hit|whoosh|pop|riser|click), 0-6 штук на версию, на смысловых словах.
 
+{CUTS_PROMPT if with_cuts else ""}
 Правила: все idx должны существовать в words.txt. Ничего не выдумывай и не меняй слова автора. Другие файлы не читай."""
 
 
-def words_txt(tr) -> str:
+def words_txt(tr, drop=None) -> str:
     w = tr["words"]
-    return "\n".join(f"[{s['id']}] " + " ".join(f"{k}:{w[k]['w']}" for k in range(s["first"], s["last"] + 1))
+    drop = drop or {}
+    tok = lambda k: (f"~{k}:{w[k]['w']}~" if k in drop else f"{k}:{w[k]['w']}")
+    return chr(10).join(f"[{s['id']}] " + " ".join(tok(k) for k in range(s["first"], s["last"] + 1))
                      for s in tr["sentences"])
 
 
-def run_claude(tr, model: str) -> dict:
+def run_claude(tr, model: str, drop=None, with_cuts=False) -> dict:
     tmp = Path(tempfile.mkdtemp(prefix="plan_"))
-    (tmp / "words.txt").write_text(words_txt(tr), encoding="utf-8")
-    cmd = ["claude", "-p", build_prompt(tr), "--model", model, "--max-turns", str(MAX_TURNS),
+    (tmp / "words.txt").write_text(words_txt(tr, drop), encoding="utf-8")
+    cmd = ["claude", "-p", build_prompt(tr, with_cuts), "--model", model, "--max-turns", str(MAX_TURNS),
            "--allowedTools", "Read,Write", "--output-format", "json",
            "--json-schema", json.dumps(PLANS_SCHEMA)]
     log(f"[plan_claude] claude -p model={model} max-turns={MAX_TURNS} (words={len(tr['words'])})")
@@ -117,6 +136,34 @@ def run_claude(tr, model: str) -> dict:
         data = json.loads(m.group(0))
     shutil.rmtree(tmp, ignore_errors=True)
     return data
+
+
+def plan_raw(words, sents, drop, dur):
+    """Один вызов Claude на СЫРОМ транскрипте (до нарезки): выборы для V1..V5 + вырезы (cuts) в индексах сырых слов.
+    Возвращает dict или {"_fallback": причина} (с громкой строкой PLAN FALLBACK)."""
+    tr = {"duration": dur, "words": [{"w": w["w"]} for w in words],
+          "sentences": [{"id": n, "first": s_[0], "last": s_[-1]} for n, s_ in enumerate(sents)]}
+    model = os.environ.get("PLAN_MODEL") or CONFIG.get("PLAN_MODEL", "opus")
+    try:
+        if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
+            raise RuntimeError("CLAUDE_CODE_OAUTH_TOKEN не задан")
+        data = run_claude(tr, model, drop=drop, with_cuts=True)
+        validate(data, PLANS_SCHEMA)
+        n = len(words)
+        for v in STYLES:
+            ch = data[v]
+            idxs = [ch["hook"]["first"], ch["hook"]["last"], *ch["emphasis"], *(g["word"] for g in ch["graphics"]),
+                    *(s_["word"] for s_ in ch["sfx"])]
+            if any(i >= n for i in idxs):
+                raise ValueError(f"{v}: индекс слова вне транскрипта")
+        for c_ in data.get("cuts", []):
+            if c_["first"] > c_["last"] or c_["last"] >= n:
+                raise ValueError("cuts: плохой диапазон")
+        return data
+    except Exception as e:  # noqa
+        reason = scrub(f"{type(e).__name__}: {str(e)[:300]}")
+        print(f"PLAN FALLBACK: {reason}", flush=True)
+        return {"_fallback": reason}
 
 
 def main():
