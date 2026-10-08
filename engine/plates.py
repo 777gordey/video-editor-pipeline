@@ -34,10 +34,11 @@ def pexels_plate(style, cache: Path):
     for v in r.json().get("videos", []):
         if v.get("duration", 0) < 6:
             continue
+        dpen = 0 if v["duration"] <= 25 else 4000 + 100 * (v["duration"] - 25)   # длинные ролики = тяжёлые файлы
         for f in v.get("video_files", []):
             if f.get("file_type") != "video/mp4" or not f.get("width") or f["width"] > f["height"]:
                 continue
-            score = abs(f["width"] - 1080) + (0 if f["width"] >= 720 else 5000)
+            score = abs(f["width"] - 1080) + (0 if f["width"] >= 720 else 5000) + dpen + (3000 if f["width"] > 1440 else 0)
             if best is None or score < best[0]:
                 best = (score, f["link"], v["id"])
     if not best:

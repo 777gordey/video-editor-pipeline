@@ -58,7 +58,7 @@
     const toks = words.slice(c.first, c.last + 1).map((w) => tidy(w.w));
     const lng = Math.max(...toks.map((x) => x.length));
     const tot = toks.join(" ").length;
-    box.style.fontSize = Math.min(fitSize(S.cap_size, lng, 880, 1.28), fitSize(S.cap_size, tot / 2, 880, 1.1)) + "px";
+    box.style.fontSize = Math.min(fitSize(S.cap_size, lng, 860, 1.3), fitSize(S.cap_size, tot / 2, 860, 1.15)) + "px";
     const spans = [];
     for (let i = c.first; i <= c.last; i++) {
       const emph = emphSet.has(i);
@@ -66,6 +66,7 @@
       spans.push([sp, words[i].start, emph]);
     }
     tl.set(box, { opacity: 1 }, t0);
+    if (S.id === "V5") spans.forEach(([sp]) => tl.set(sp, { opacity: 1 }, t0));   // пилюля не должна быть пустой
     spans.forEach(([sp, ws, emph]) => {
       tl.set(sp, { opacity: 1, color: emph ? C.emph : C.accent }, ws);
       tl.fromTo(sp, { scale: emph ? 0.6 : 0.8 }, { scale: emph ? 1.22 : 1, duration: 0.14, ease: "back.out(2.4)", immediateRender: false }, ws);
@@ -129,7 +130,7 @@
       const t = 0.05 + i * 0.14;
       tl.set(sp, { opacity: 1, rotationY: -80, transformPerspective: 900 }, t);
       tl.to(sp, { rotationY: 0, duration: 0.45, ease: "back.out(1.6)" }, t);
-      tl.to(sp, { rotationY: 8, duration: Math.max(0.1, T1 - t - 0.5), ease: "sine.inOut" }, t + 0.45);
+      tl.to(sp, { rotationY: 4, duration: Math.max(0.1, T1 - t - 0.5), ease: "sine.inOut" }, t + 0.45);
     });
   } else if (st === "pastel") {
     hookEl.classList.add("pastel");

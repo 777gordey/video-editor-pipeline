@@ -87,28 +87,44 @@ def main():
     proj = work / "proj"
     layers = {}
     with stage("layers"):
+        from concurrent.futures import ThreadPoolExecutor
         proj_media = proj / "media"
         proj_media.mkdir(parents=True, exist_ok=True)
         person = proj_media / "person.mp4"
-        run(["ffmpeg", "-y", "-loglevel", "error", "-i", prepped, "-an", "-vf", style["grade"],
-             "-c:v", "libx264", "-preset", "fast", "-crf", 13, "-r", FPS, "-pix_fmt", "yuv420p", person])
+
+        def grade():
+            run(["ffmpeg", "-y", "-loglevel", "error", "-i", prepped, "-an", "-vf", style["grade"],
+                 "-c:v", "libx264", "-preset", "fast", "-crf", 13, "-r", FPS, "-pix_fmt", "yuv420p", person])
+
+        def plate():
+            if style["bg"] != "plate":
+                return None
+            return plates.prepare_plate(style, dur, proj_media / "plate.mp4", work / "plate_cache")
+
+        def do_matte():
+            if not (style["bg"] != "room" and style["matte"] and not a.no_matte):
+                return None
+            t0 = time.time()
+            alpha = work / "alpha_small.mkv"
+            matte_mod.matte(prepped, alpha, work / "rvm.onnx")
+            T["matte"] = round(time.time() - t0, 1)
+            return alpha
+
         layers["person"] = "person.mp4"
-        if style["bg"] != "room":
-            plate_path = None
-            if style["bg"] == "plate":
-                plate_path = plates.prepare_plate(style, dur, proj_media / "plate.mp4", work / "plate_cache")
-                if plate_path:
-                    layers["plate"] = "plate.mp4"
-            if style["matte"] and not a.no_matte:
-                try:
-                    with stage("matte"):
-                        alpha = work / "alpha_small.mkv"
-                        matte_mod.matte(prepped, alpha, work / "rvm.onnx")
-                        matte_mod.build_layers(person, alpha, proj_media / "inv.mp4", proj_media / "black.mp4")
-                        layers.update(inv="inv.mp4", black="black.mp4")
-                except Exception as e:  # noqa
-                    print(f"MATTE FALLBACK: {type(e).__name__}: {str(e)[:200]} — фон остаётся исходным", flush=True)
-                    layers.pop("plate", None)
+        with ThreadPoolExecutor(3) as ex:          # плейт, грейд и вырезка фона идут одновременно
+            f_g, f_p, f_m = ex.submit(grade), ex.submit(plate), ex.submit(do_matte)
+            f_g.result()
+            plate_path = f_p.result()
+            if plate_path:
+                layers["plate"] = "plate.mp4"
+            try:
+                alpha = f_m.result()
+                if alpha:
+                    matte_mod.build_layers(person, alpha, proj_media / "inv.mp4", proj_media / "black.mp4")
+                    layers.update(inv="inv.mp4", black="black.mp4")
+            except Exception as e:  # noqa
+                print(f"MATTE FALLBACK: {type(e).__name__}: {str(e)[:200]} — фон остаётся исходным", flush=True)
+                layers.pop("plate", None)
 
     with stage("compose"):
         compose.build_project(proj, style, pl, tr, layers)

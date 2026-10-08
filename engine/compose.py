@@ -53,12 +53,12 @@ STYLE_CSS = {
 """,
     "V4": """
 .chunk{text-shadow:0 0 22px rgba(77,163,255,.7),0 6px 0 rgba(0,0,0,.6);-webkit-text-stroke:5px #05070D;paint-order:stroke fill;letter-spacing:.02em}
-#hook.chrome3d{top:230px}
-#hook.chrome3d .hw{position:relative;font-size:1em;color:#56627a;line-height:1.05;margin:0 14px}
-#hook.chrome3d .hw::after{content:attr(data-t);position:absolute;left:0;top:0;background:linear-gradient(180deg,#fff 0%,#cfd8e8 38%,#6c7b95 50%,#eef3fb 66%,#8795ae 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#hook.chrome3d{top:230px;filter:drop-shadow(0 0 22px rgba(77,163,255,.65)) brightness(1.25)}
+#hook.chrome3d .hw{position:relative;font-size:1em;color:#7f93b8;line-height:1.05;margin:0 14px}
+#hook.chrome3d .hw::after{content:attr(data-t);position:absolute;left:0;top:0;background:linear-gradient(180deg,#ffffff 0%,#e6eefb 36%,#9db4d6 50%,#ffffff 64%,#b9c9e4 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 """,
     "V5": """
-.chunk{background:rgba(255,255,255,.9);border-radius:64px;padding:22px 46px;box-shadow:0 14px 44px rgba(255,111,145,.35);font-weight:900;-webkit-text-stroke:0}
+.chunk{width:max-content;max-width:940px;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.9);border-radius:64px;padding:22px 46px;box-shadow:0 14px 44px rgba(255,111,145,.35);font-weight:900;-webkit-text-stroke:0}
 #hook.pastel .hw{font-family:'Nunito';font-weight:900;font-size:1em;color:#4B3A5A;background:#fff;border-radius:64px;padding:6px 40px;margin:10px;box-shadow:0 14px 44px rgba(255,111,145,.4)}
 """,
 }
@@ -114,6 +114,7 @@ video.layer{{object-fit:cover}}
   font-family:'{style['font']}',sans-serif;font-weight:{style['font_weight']};font-size:{style['cap_size']}px;line-height:1.08;
   color:var(--text);{'text-transform:uppercase;' if style['caps'] else ''}word-spacing:.05em}}
 .chunk .w{{display:inline-block;opacity:0;margin:0 .1em}}
+.chunk .w.emph{{margin:0 .26em}}
 #hook{{position:absolute;left:60px;top:250px;width:960px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 20px;
   text-align:center;font-family:'{style['font']}',sans-serif;font-weight:{style['font_weight']}}}
 #hook .hw{{display:inline-block;opacity:0;line-height:1.1}}
