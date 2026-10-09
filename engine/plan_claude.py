@@ -157,7 +157,7 @@ HOOK_ITEM = {"type": "object", "required": ["text", "first", "last", "promise", 
 
 def call_json(prompt, schema, model, tmp, tools="Read"):
     """Один небольшой вызов claude -p -> dict (structured output). Бросает RuntimeError."""
-    cmd = ["claude", "-p", prompt, "--model", model, "--max-turns", "4", "--allowedTools", tools,
+    cmd = ["claude", "-p", prompt, "--model", model, "--max-turns", "6", "--allowedTools", tools,
            "--output-format", "json", "--json-schema", json.dumps(schema)]
     try:
         p = subprocess.run(cmd, cwd=tmp, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=TIMEOUT, env=dict(os.environ))

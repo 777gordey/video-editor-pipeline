@@ -631,7 +631,7 @@
               "id": "76a23a43-1420-4fc9-adb9-93aaac956f8a",
               "name": "timeout_min",
               "type": "number",
-              "value": "={{$json.use_v2 ? 60 : 10}}"
+              "value": "={{$json.use_v2 ? 75 : 10}}"
             }
           ]
         }
