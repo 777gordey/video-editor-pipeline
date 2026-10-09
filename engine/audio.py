@@ -185,9 +185,22 @@ def mix(voice_media, music, amb, sfx, style, out_wav):
     j = json.loads(m.group(0))
     # линейное усиление до цели + мягкий лимитер на -1.5 dBFS (loudnorm linear упирался в пики голоса и давал -15 LUFS)
     gain = LUFS - float(j["input_i"])
-    ln = f"volume={gain:.2f}dB,alimiter=limit=0.84:attack=3:release=60:level=disabled"
-    run(["ffmpeg", "-y", "-loglevel", "error", *ins, "-filter_complex", chain + f",{ln},aresample={SR}[o]",
-         "-map", "[o]", "-ac", 2, "-ar", SR, out_wav])
+    for attempt in range(3):         # лимитер съедает часть громкости: замеряем результат и доводим до цели
+        ln = f"volume={gain:.2f}dB,alimiter=limit=0.86:attack=3:release=60:level=disabled"
+        run(["ffmpeg", "-y", "-loglevel", "error", *ins, "-filter_complex", chain + f",{ln},aresample={SR}[o]",
+             "-map", "[o]", "-ac", 2, "-ar", SR, out_wav])
+        pm = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", "-i", str(out_wav), "-af",
+                             f"loudnorm=I={LUFS}:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"],
+                            capture_output=True, text=True)
+        mm = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", pm.stderr, re.S)
+        if not mm:
+            break
+        jm = json.loads(mm.group(0))
+        li, tp = float(jm["input_i"]), float(jm["input_tp"])
+        log(f"[audio] attempt {attempt}: {li:.2f} LUFS, true peak {tp:.2f} dBTP")
+        if abs(li - LUFS) <= 0.35 or tp > -1.1:
+            break
+        gain += (LUFS - li)
     log(f"[audio] loudnorm pass1 input_i={j['input_i']} -> target {LUFS} LUFS")
 
 
