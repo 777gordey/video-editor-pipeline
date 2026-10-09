@@ -226,6 +226,8 @@ def cmd_report(a):
             pl_ = load_json(pj)
             lines.append(f"- Hook ({pl_.get('source')}): «{pl_.get('hook', {}).get('text', '')}»"
                          + (f"  — PLAN FALLBACK: {pl_['fallback_reason']}" if pl_.get("fallback_reason") else ""))
+            if pl_.get("caption_match"):
+                lines.append(f"- {pl_['caption_match']}")
         lines.append("")
     extra = Path(a.notes).read_text(encoding="utf-8") if a.notes and Path(a.notes).exists() else ""
     lines += [f"Overall: {'ALL CHECKS PASSED' if allok else 'SOME CHECKS FAILED'}", ""]

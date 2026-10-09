@@ -343,7 +343,7 @@ def semantic_check(plan, n_words):
 
 
 # ------------------------------------------------------------------------- main
-def build_plan(version, tr, choices=None, force_rules=False, beats=None):
+def build_plan(version, tr, choices=None, force_rules=False, beats=None, caption=None):
     style = STYLES[version]
     words, sents, dur = tr["words"], tr["sentences"], tr["duration"]
     vidx = list(STYLES).index(version)
@@ -373,9 +373,37 @@ def build_plan(version, tr, choices=None, force_rules=False, beats=None):
         gcand = rule_graphics(words, style, dur)
     # хук не длиннее 6 слов и не дольше 2 c
     hl = min(hl, hf + 5)
+    cap_hook = None
+    cap_matches = []
+    if caption:
+        try:
+            import caption as capmod
+            cap_matches = capmod.apply_triggers(caption, words)
+            for m in cap_matches:                                # триггеры: акцент на слова + графика на начале слова
+                if m["level"] in ("ok", "weak"):
+                    emph = sorted(set(emph) | set(range(m["first"], m["last"] + 1)))
+                    kw = None
+                    for rx, g in KEYWORD_GRAPHICS:
+                        if re.search(rx, norm(words[m["first"]]["w"])):
+                            kw = g
+                            break
+                    gcand = list(gcand) + [{"word": m["first"], "kind": (kw or {}).get("kind", "icon"),
+                                            "icon": (kw or {}).get("icon", "star"), "text": (kw or {}).get("text", ""),
+                                            "num": None}]
+            vi = list(STYLES).index(version)
+            if vi < len(caption.get("hooks", [])) and caption["hooks"][vi]:
+                cap_hook = caption["hooks"][vi]
+                mm = capmod.match_phrase(cap_hook, words[: max(8, int(len(words) * 0.3))])   # где в речи это сказано
+                if mm and mm[2] >= capmod.OK_SCORE:
+                    hf, hl = mm[0], min(mm[1], mm[0] + 5)
+                else:
+                    hf, hl = 0, min(5, len(words) - 1)
+        except Exception as e:  # noqa — кривая подпись не должна ломать прогон
+            print(f"CAPTION IGNORED: {type(e).__name__}: {str(e)[:120]}", flush=True)
+            cap_hook = None
     plan = {
         "version": version, "source": source, "duration": dur,
-        "hook": {"text": clean_hook_text(words, hf, hl), "first": hf, "last": hl, "t0": 0.0, "t1": 2.0},
+        "hook": {"text": cap_hook or clean_hook_text(words, hf, hl), "first": hf, "last": hl, "t0": 0.0, "t1": 2.0},
         "emphasis": emph, "chunks": chunks,
     }
     if reason:
@@ -392,13 +420,19 @@ def build_plan(version, tr, choices=None, force_rules=False, beats=None):
         except (KeyError, ValueError, TypeError):
             pass
     plan["sfx"].sort(key=lambda x: x["t"])
+    if caption:
+        try:
+            import caption as capmod
+            plan["caption_match"] = capmod.summary(caption, cap_matches, list(STYLES).index(version))
+        except Exception:  # noqa
+            pass
     try:
         validate(plan, PLAN_SCHEMA)
         semantic_check(plan, len(words))
     except (ValidationError, ValueError) as e:
         if source == "claude":   # ответ Claude испортил план — откат на правила, не молча
             print(f"PLAN FALLBACK: validation: {str(e)[:200]}", flush=True)
-            return build_plan(version, tr, choices, force_rules=True, beats=beats)
+            return build_plan(version, tr, choices, force_rules=True, beats=beats, caption=caption)
         raise
     return plan
 

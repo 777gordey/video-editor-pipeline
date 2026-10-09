@@ -61,7 +61,7 @@ def main():
     ap.add_argument("--alpha", default=None, help="готовая alpha_small.mkv (общая для всех версий)")
     a = ap.parse_args()
     v = a.version
-    style = STYLES[v]
+    style = dict(STYLES[v])
     prep, out, work = Path(a.prep), Path(a.out), Path(a.work) / v
     out.mkdir(parents=True, exist_ok=True)
     work.mkdir(parents=True, exist_ok=True)
@@ -71,12 +71,27 @@ def main():
     tr["duration"] = dur
     log(f"[{v}] {style['name']} — клип {dur:.1f}s")
 
+    try:
+        _cj = prep / "caption.json"
+        _bg = (load_json(_cj).get("bg") if _cj.exists() else None)
+        if _bg and style["bg"] == "plate":
+            log(f"[plate] caption background query: {_bg}")
+            style["plate_query"] = _bg
+            style["plate_query_default"] = STYLES[v]["plate_query"]
+    except Exception:  # noqa
+        pass
     with stage("audio"):
         music = work / "music.wav"
         msrc, beats = audio.prepare_music(style, dur, music)
         log(f"[audio] music={msrc} beats={len(beats)}")
         pj = prep / "plans.json"
-        pl = plan_mod.build_plan(v, tr, load_json(pj) if pj.exists() else None, beats=beats)
+        cap = None
+        try:
+            cj = prep / "caption.json"
+            cap = load_json(cj) if cj.exists() else None
+        except Exception:  # noqa
+            cap = None
+        pl = plan_mod.build_plan(v, tr, load_json(pj) if pj.exists() else None, beats=beats, caption=cap)
         save_json(out / f"plan_{v}.json", pl)
         log(f"[plan {v}] source={pl['source']} hook=«{pl['hook']['text']}» cams={len(pl['cams'])} "
             f"snaps={len(pl['snaps'])} graphics={len(pl['graphics'])} sfx={len(pl['sfx'])}")

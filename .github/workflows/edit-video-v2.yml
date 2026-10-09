@@ -21,6 +21,10 @@ on:
         description: "Test only: darken the source by N stops (1.5 = underexposed test)"
         required: false
         default: "0"
+      caption:
+        description: "Test only: Telegram caption (ХУКИ / ТРИГГЕРЫ / ФОН)"
+        required: false
+        default: ""
       loop:
         description: "Test only: repeat the source N times (2 = long-clip stress test)"
         required: false
@@ -109,6 +113,14 @@ jobs:
       - name: Install Claude Code
         run: npm i -g @anthropic-ai/claude-code@2.1.293 --no-audit --no-fund && claude --version
 
+      # Caption goes through env only (never interpolated into a shell line); bad input = empty result.
+      - name: Parse caption
+        env:
+          CAPTION: ${{ github.event.client_payload.caption || github.event.inputs.caption }}
+        run: |
+          mkdir -p out
+          python engine/caption.py out/caption.json || echo '{"hooks":[],"triggers":[],"bg":null,"warnings":["parse failed"]}' > out/caption.json
+
       - name: Prep (normalize, transcribe, cut, speed up)
         env:
           WHISPER_MODEL: ${{ github.event.inputs.whisper || 'large-v3' }}
@@ -129,6 +141,7 @@ jobs:
             out/plans.json
             out/cuts.md
             out/exposure.json
+            out/caption.json
             out/exposure_compare.jpg
           retention-days: 1
           if-no-files-found: error

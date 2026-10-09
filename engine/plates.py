@@ -23,11 +23,22 @@ def brand_plate(style):
 
 
 def pexels_plate(style, cache: Path):
+    try:
+        return _pexels_plate(style, cache, style["plate_query"])
+    except RuntimeError as e:
+        dq = style.get("plate_query_default")
+        if dq and dq != style["plate_query"]:
+            print(f"PLATE FALLBACK: caption background gave nothing ({str(e)[:80]}), default query used", flush=True)
+            return _pexels_plate(style, cache, dq)
+        raise
+
+
+def _pexels_plate(style, cache: Path, query):
     key = os.environ.get("PEXELS_API_KEY")
     if not key:
         raise RuntimeError("PEXELS_API_KEY не задан")
     r = requests.get("https://api.pexels.com/videos/search",
-                     params={"query": style["plate_query"], "orientation": "portrait", "size": "medium", "per_page": 15},
+                     params={"query": query, "orientation": "portrait", "size": "medium", "per_page": 15},
                      headers={"Authorization": key}, timeout=30)
     r.raise_for_status()
     best = None
