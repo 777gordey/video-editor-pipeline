@@ -259,28 +259,26 @@ jobs:
           python-version: "3.11"
       - uses: actions/download-artifact@v4
         with:
+          pattern: "{prep,debug-*}"
           path: parts
       - run: pip install 'numpy<2.3'
       - name: Assemble
         run: |
           mkdir -p result
           cp parts/prep/cuts.md result/cuts.md
-          find parts -name 'final_V*.mp4' -exec cp {} result/ \;
-          find parts -name 'cover_V*.jpg' -exec cp {} result/ \;
+          find parts -name 'qa_V*.json' | sed 's#.*/##' > result/_finals.txt
           find parts -name 'contact_V*.jpg' -exec cp {} result/ \;
           find parts -name 'timings_V*.json' -exec cp {} result/ \;
           cd engine && python qa.py report --dir ../parts --out ../result/QA_report.md
           cd ..
           cat result/QA_report.md
           ls -la result
-          n=$(ls result/final_V*.mp4 2>/dev/null | wc -l); echo "versions ready: $n"
+          n=$(wc -l < result/_finals.txt); echo "versions ready: $n"
           test "$n" -ge 1
       - uses: actions/upload-artifact@v4
         with:
-          name: result
+          name: docs
           path: |
-            result/final_V*.mp4
-            result/cover_V*.jpg
             result/contact_V*.jpg
             result/cuts.md
             result/QA_report.md
