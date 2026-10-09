@@ -73,15 +73,27 @@ def matte(video: Path, out_alpha: Path, model_path: Path):
 
 
 def build_layers(person: Path, alpha_small: Path, inv_out: Path, black_out: Path):
+    """Два независимых кодирования идут ОДНОВРЕМЕННО (раньше — по очереди), veryfast: слои уходят в рендер и не хранятся."""
     a = (f"[1:v]scale={W}:{H}:flags=lanczos,format=gray,gblur=sigma=1.4,"
          f"curves=all='0/0 0.08/0 0.92/1 1/1',format=gray")   # чуть сжимаем края: меньше ореола
-    run(["ffmpeg", "-y", "-loglevel", "error", "-i", person, "-i", alpha_small, "-filter_complex",
-         f"{a},negate[inv];[inv]format=yuv420p[o]", "-map", "[o]", "-an", "-c:v", "libx264", "-preset", "fast",
-         "-crf", 12, "-r", FPS, inv_out])
-    run(["ffmpeg", "-y", "-loglevel", "error", "-i", person, "-i", alpha_small, "-filter_complex",
+    th = str(max(2, (os.cpu_count() or 4) // 2))
+    cmds = [
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", person, "-i", alpha_small, "-filter_complex",
+         f"{a},negate[inv];[inv]format=yuv420p[o]", "-map", "[o]", "-an", "-c:v", "libx264", "-preset", "veryfast",
+         "-crf", 14, "-threads", th, "-r", FPS, inv_out],
+        ["ffmpeg", "-y", "-loglevel", "error", "-i", person, "-i", alpha_small, "-filter_complex",
          f"{a}[al];[0:v]format=yuv444p[p];[p][al]alphamerge[pa];"
          f"color=c=black:s={W}x{H}:r={FPS}[bk];[bk][pa]overlay=shortest=1:format=auto,format=yuv420p[o]",
-         "-map", "[o]", "-an", "-c:v", "libx264", "-preset", "fast", "-crf", 12, "-r", FPS, black_out])
+         "-map", "[o]", "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", 14, "-threads", th, "-r", FPS, black_out],
+    ]
+    procs = []
+    for c in cmds:
+        c = [str(x) for x in c]
+        log("+", " ".join(c)[:300])
+        procs.append(subprocess.Popen(c))
+    for p in procs:
+        if p.wait() != 0:
+            raise RuntimeError("build_layers ffmpeg failed")
 
 
 if __name__ == "__main__":

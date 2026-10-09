@@ -128,7 +128,7 @@ def main():
                 except Exception as e:  # noqa
                     log(f"[plate-match] skipped: {e}")
             run(["ffmpeg", "-y", "-loglevel", "error", "-i", prepped, "-an", "-vf", vf,
-                 "-c:v", "libx264", "-preset", "fast", "-crf", 13, "-r", FPS, "-pix_fmt", "yuv420p", person])
+                 "-c:v", "libx264", "-preset", "veryfast", "-crf", 14, "-r", FPS, "-pix_fmt", "yuv420p", person])
 
         def plate():
             if style["bg"] != "plate":
