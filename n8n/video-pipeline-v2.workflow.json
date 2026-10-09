@@ -159,6 +159,18 @@
               "name": "caption",
               "type": "string",
               "value": "={{ String($('Telegram Trigger').item.json.message.caption || '').slice(0, 1500) }}"
+            },
+            {
+              "id": "job_id",
+              "name": "job_id",
+              "type": "string",
+              "value": "={{ 'j' + Date.now() + 'e' + $execution.id }}"
+            },
+            {
+              "id": "source_run",
+              "name": "source_run",
+              "type": "string",
+              "value": "={{ String($('Telegram Trigger').item.json.message.source_run || '') }}"
             }
           ]
         }
@@ -189,7 +201,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { \"event_type\": $json.event_type, \"client_payload\": { \"video_url\": $json.video_url, \"caption\": $json.caption || \"\" } } }}",
+        "jsonBody": "={{ { \"event_type\": $json.event_type, \"client_payload\": { \"video_url\": $json.video_url, \"caption\": $json.caption || \"\", \"job_id\": $json.job_id, \"source_run\": $json.source_run || \"\" } } }}",
         "options": {}
       },
       "id": "http-dispatch",
@@ -225,7 +237,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/workflows/{{$('Pipeline config').first().json.workflow_file}}/runs?event=repository_dispatch&per_page=5",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/workflows/{{$('Pipeline config').first().json.workflow_file}}/runs?event=repository_dispatch&per_page=50",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "githubApi",
         "options": {}
@@ -247,7 +259,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const dispatchTs = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst runs = $input.first().json.workflow_runs || [];\nconst match = runs.find(r => new Date(r.created_at).getTime() >= dispatchTs - 5000);\nif (!match) {\n  return [{ json: { found: false, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];\n}\nreturn [{ json: { found: true, run_id: match.id, status: match.status, conclusion: match.conclusion, html_url: match.html_url, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];"
+        "jsCode": "const slot = $('Take slot').last().json;\nconst runs = $input.first().json.workflow_runs || [];\nconst match = runs.find(r => (r.display_title || '').includes(slot.job_id));\nif (!match) {\n  return [{ json: { found: false, dispatch_ts: slot.dispatch_ts } }];\n}\nreturn [{ json: { found: true, run_id: match.id, status: match.status, conclusion: match.conclusion, html_url: match.html_url, dispatch_ts: slot.dispatch_ts } }];"
       },
       "id": "code-pick-run",
       "name": "Pick matching run",
@@ -298,7 +310,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const started = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst lim = $('Pipeline config').first().json.timeout_min;\nconst elapsedMin = (Date.now() - started) / 60000;\nreturn [{ json: { elapsedMin, timedOut: elapsedMin > lim, limit: lim } }];"
+        "jsCode": "const started = new Date($('Take slot').last().json.dispatch_ts).getTime();\nconst lim = $('Pipeline config').first().json.timeout_min;\nconst elapsedMin = (Date.now() - started) / 60000;\nreturn [{ json: { elapsedMin, timedOut: elapsedMin > lim, limit: lim } }];"
       },
       "id": "code-check-timeout",
       "name": "Check timeout",
@@ -786,6 +798,151 @@
         }
       },
       "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.floor(Math.random() * 25) + 1 }}",
+        "unit": "seconds"
+      },
+      "id": "55351b65-bd3e-49c1-9963-c9c42278c21e",
+      "name": "Stagger",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/workflows/edit-video-v2.yml/runs?per_page=50",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "1de1e13e-cca1-4239-aa70-fa2359d4edba",
+      "name": "List active runs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        -300
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const LIMIT = __LIMIT__;   // soft limit: clips processed at the same time\nconst runs = $input.first().json.workflow_runs || [];\nconst active = runs.filter(r => ['queued', 'in_progress', 'waiting', 'requested', 'pending'].includes(r.status)).length;\nconst base = $('Build video_url').first().json;\nif (active < LIMIT) {\n  return [{ json: { ...base, slot: true, dispatch_ts: new Date().toISOString(), notify: false } }];\n}\nreturn [{ json: { ...base, slot: false, notify: $runIndex === 0, active } }];"
+      },
+      "id": "1467132c-c087-4e6e-9b3e-5ad0996309a4",
+      "name": "Take slot",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.slot}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "fa0c7757-a491-43a1-adef-bcbd245c6d63",
+      "name": "Slot free?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1720,
+        -300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.notify}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "e66e8aa9-f648-4dd1-abb3-78a0f5aa0762",
+      "name": "First time queued?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1920,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$json.chat_id}}",
+        "text": "=Видео принято, но сейчас идёт обработка других клипов. Ваш в очереди, начнётся сам, как освободится место.",
+        "additionalFields": {}
+      },
+      "id": "ee78b90b-33d2-4387-a720-f2281841968c",
+      "name": "Queued notice",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2120,
+        -220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 60,
+        "unit": "seconds"
+      },
+      "id": "8a9a0a8a-a50a-4192-b10d-e840a51a8e02",
+      "name": "Wait in queue",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2120,
+        -80
+      ]
     }
   ],
   "connections": {
@@ -845,7 +1002,7 @@
       "main": [
         [
           {
-            "node": "Pipeline switch (use_v2)",
+            "node": "Stagger",
             "type": "main",
             "index": 0
           }
@@ -1110,6 +1267,97 @@
         [
           {
             "node": "Notify missing versions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stagger": {
+      "main": [
+        [
+          {
+            "node": "List active runs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List active runs": {
+      "main": [
+        [
+          {
+            "node": "Take slot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Take slot": {
+      "main": [
+        [
+          {
+            "node": "Slot free?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slot free?": {
+      "main": [
+        [
+          {
+            "node": "Pipeline switch (use_v2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "First time queued?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "First time queued?": {
+      "main": [
+        [
+          {
+            "node": "Queued notice",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait in queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queued notice": {
+      "main": [
+        [
+          {
+            "node": "Wait in queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait in queue": {
+      "main": [
+        [
+          {
+            "node": "List active runs",
             "type": "main",
             "index": 0
           }
