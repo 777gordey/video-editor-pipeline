@@ -44,7 +44,7 @@ def parse(raw):
                 if len(w) > MAX_HOOK_WORDS:
                     out["warnings"].append(f"hook {i + 1} cut from {len(w)} to {MAX_HOOK_WORDS} words")
                     h = " ".join(w[:MAX_HOOK_WORDS])
-                out["hooks"].append(h[:70])
+                out["hooks"].append(h[:70] if re.search(r"\w{2,}", h) else "")      # мусор без слов = нет хука
             if len(hooks) > 5:
                 out["warnings"].append("more than 5 hooks, extra ignored")
         if "ТРИГГЕРЫ" in sec:
