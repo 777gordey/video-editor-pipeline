@@ -1,5 +1,8 @@
 name: Edit video v2
 
+# job_id (from n8n) goes into the run title so n8n can find exactly ITS run when several clips run at once
+run-name: Edit video v2 ${{ github.event.client_payload.job_id }}
+
 on:
   repository_dispatch:
     types: [edit-video-v2]
@@ -114,7 +117,7 @@ jobs:
       - name: Download source
         env:
           VIDEO_URL: ${{ github.event.client_payload.video_url || github.event.inputs.video_url || secrets.TEST_VIDEO_URL }}
-          SOURCE_RUN: ${{ github.event.inputs.source_run }}
+          SOURCE_RUN: ${{ github.event.client_payload.source_run || github.event.inputs.source_run }}
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ -n "$SOURCE_RUN" ]; then
