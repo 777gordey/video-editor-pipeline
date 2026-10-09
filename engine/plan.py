@@ -332,7 +332,7 @@ def semantic_check(plan, n_words):
     h = plan["hook"]
     if not (0 <= h["first"] <= h["last"] < n_words):
         raise ValueError("hook indices out of range")
-    if h["last"] - h["first"] + 1 > 6:
+    if len(str(h.get("text", "")).split()) > 6:
         raise ValueError("hook longer than 6 words")
     for i in plan["emphasis"]:
         if i >= n_words:
@@ -348,11 +348,14 @@ def build_plan(version, tr, choices=None, force_rules=False, beats=None, caption
     words, sents, dur = tr["words"], tr["sentences"], tr["duration"]
     vidx = list(STYLES).index(version)
     source, reason = "claude", None
+    hook_txt, hook_meta = None, {}
     try:
         if force_rules:
             raise RuntimeError("forced rules (validation)")
         ch = get_choices(version, choices)
         hf, hl = int(ch["hook"]["first"]), int(ch["hook"]["last"])
+        hook_txt = (ch["hook"].get("text") or "").strip() or None
+        hook_meta = {k: ch["hook"][k] for k in ("why", "promise", "check") if ch["hook"].get(k)}
         emph = sorted({int(i) for i in ch.get("emphasis", []) if 0 <= int(i) < len(words)})
         gcand = []
         for g in ch.get("graphics", []):
@@ -403,7 +406,8 @@ def build_plan(version, tr, choices=None, force_rules=False, beats=None, caption
             cap_hook = None
     plan = {
         "version": version, "source": source, "duration": dur,
-        "hook": {"text": cap_hook or clean_hook_text(words, hf, hl), "first": hf, "last": hl, "t0": 0.0, "t1": 2.0},
+        "hook": {"text": cap_hook or hook_txt or clean_hook_text(words, hf, hl), "first": hf, "last": hl, "t0": 0.0, "t1": 2.0,
+                 **({"from_caption": True} if cap_hook else hook_meta)},
         "emphasis": emph, "chunks": chunks,
     }
     if reason:

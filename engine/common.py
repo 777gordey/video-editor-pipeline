@@ -1,5 +1,6 @@
 """Общие утилиты движка v2: конфиг, запуск команд, ffprobe."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -8,7 +9,7 @@ ENGINE_DIR = Path(__file__).resolve().parent
 REPO_DIR = ENGINE_DIR.parent
 
 CONFIG = json.loads((ENGINE_DIR / "config.json").read_text(encoding="utf-8"))
-SPEED = float(CONFIG["SPEED"])          # единственная настройка скорости
+SPEED = float(os.environ.get("SPEED_OVERRIDE") or CONFIG["SPEED"])          # единственная настройка скорости (подпись СКОРОСТЬ: переопределяет)
 FPS = int(CONFIG["FPS"])
 W, H = int(CONFIG["WIDTH"]), int(CONFIG["HEIGHT"])
 AR = int(CONFIG["AUDIO_RATE"])

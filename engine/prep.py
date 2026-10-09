@@ -108,6 +108,15 @@ def transcribe(path: Path, model_name: str):
             if t:
                 words.append({"w": t, "start": float(w.start), "end": float(w.end),
                               "p": float(w.probability or 0)})
+    merged = []                                   # Whisper отдаёт «По», «-другому» отдельными словами: склеиваем «По-другому», «что-либо»
+    for w in words:
+        if merged and re.match(r"-[^\W\d_]", w["w"]):
+            merged[-1]["w"] += w["w"]
+            merged[-1]["end"] = w["end"]
+            merged[-1]["p"] = min(merged[-1]["p"], w["p"])
+        else:
+            merged.append(w)
+    words = merged
     log(f"[prep] words={len(words)} lang={info.language}")
     return words
 
@@ -269,8 +278,8 @@ def remap_plans(data, fw, n_raw):
         hf, hl = nxt(ch["hook"]["first"]), prv(ch["hook"]["last"])
         if hl < hf:
             hl = hf
-        hl = min(hl, hf + 5)
-        out[v] = {"hook": {"first": hf, "last": hl},
+        hl = min(hl, hf + 11)
+        out[v] = {"hook": {**{k: ch["hook"][k] for k in ("text", "promise", "why", "check") if k in ch["hook"]}, "first": hf, "last": hl},
                   "emphasis": sorted({pos[i] for i in ch["emphasis"] if i in pos}),
                   "graphics": [{**g, "word": pos[g["word"]]} for g in ch["graphics"] if g["word"] in pos],
                   "sfx": [{**e, "word": pos[e["word"]]} for e in ch["sfx"] if e["word"] in pos]}
@@ -289,6 +298,10 @@ def write_cuts_md(path, words, drop, segs, pauses, src_dur, final_dur):
          f"- Исходник: {fmt(src_dur)} → после нарезки {fmt(sum(e - s for s, e, _ in segs))} → после ускорения **{fmt(final_dur)}**",
          f"- Кусков оставлено: {len(segs)}; мёртвых пауз >{PAUSE_MAX} с вырезано: {len(pauses)} "
          f"(всего {sum(b - a for a, b, _ in pauses):.1f} с)", ""]
+    if not drop and not pauses and len(segs) == 1:
+        L.append("- Режим «клип уже смонтирован»: ничего не вырезано, паузы и скорость не трогаем. "
+                 "Строки подписи `ПАУЗЫ: да` и `СКОРОСТЬ: 1.2` включают нарезку и ускорение.")
+        L.append("")
     for cat, title in cats.items():
         items = [(i, v) for i, v in sorted(drop.items()) if v[0] == cat]
         L.append(f"## {title}: {len(items)}")
@@ -321,11 +334,13 @@ def main():
     if len(words) < 5:
         raise SystemExit("[prep] в видео почти нет речи")
     sents = split_sentences(words)
-    drop = detect_drops(words, sents)
+    cuts_on = os.environ.get("CUTS_ON", "0") == "1"      # по умолчанию клип уже смонтирован: без вырезов (подпись «ПАУЗЫ: да» включает)
+    drop = detect_drops(words, sents) if cuts_on else {}
+    log(f"[prep] cuts={'ON' if cuts_on else 'off (pre-edited clip)'} speed={SPEED}")
     raw_plans = None
     if os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):          # один вызов Claude: выборы всех версий + вырезы по смыслу
         import plan_claude
-        raw_plans = plan_claude.plan_raw(words, [s_ for s_ in sents], drop, total)
+        raw_plans = plan_claude.plan_raw(words, [s_ for s_ in sents], drop, total, with_cuts=cuts_on)
         if "_fallback" not in raw_plans:
             extra = {}
             for c_ in raw_plans.get("cuts", []):
@@ -340,7 +355,10 @@ def main():
                 log(f"[prep] Claude cuts applied: {len(extra)} words")
     else:
         print("PLAN FALLBACK: CLAUDE_CODE_OAUTH_TOKEN не задан", flush=True)
-    segs, pauses = build_segments(words, drop, total)
+    if cuts_on:
+        segs, pauses = build_segments(words, drop, total)
+    else:                                                # без нарезки: весь клип одним куском
+        segs, pauses = [[0.0, total, list(range(len(words)))]], []
     log(f"[prep] drop={len(drop)} segments={len(segs)} pauses={len(pauses)}")
 
     prepped = out / "prepped.mp4"

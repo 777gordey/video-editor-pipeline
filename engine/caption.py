@@ -23,7 +23,7 @@ def norm(w):
 
 
 def parse(raw):
-    out = {"hooks": [], "triggers": [], "bg": None, "warnings": []}
+    out = {"hooks": [], "triggers": [], "bg": None, "warnings": [], "cuts": False, "speed": 1.0, "versions": []}
     try:
         if not raw or not isinstance(raw, str):
             return out
@@ -32,7 +32,7 @@ def parse(raw):
             raw = raw[:MAX_CAPTION]
         t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", " ", raw)
         marks = [(m.start(), m.end(), m.group(1).upper().replace("Ё", "Е"))
-                 for m in re.finditer(r"(ХУКИ|ТРИГГЕРЫ|ФОН)\s*:", t, re.I)]
+                 for m in re.finditer(r"(ХУКИ|ТРИГГЕРЫ|ФОН|ПАУЗЫ|СКОРОСТЬ|ВЕРСИИ)\s*:", t, re.I)]
         sec = {}
         for k, (s, e, name) in enumerate(marks):
             sec.setdefault(name, t[e:(marks[k + 1][0] if k + 1 < len(marks) else len(t))].strip())
@@ -54,8 +54,23 @@ def parse(raw):
             bg = re.sub(r"[^\w\s\-]", " ", sec["ФОН"].split("\n")[0], flags=re.U)
             bg = re.sub(r"\s+", " ", bg).strip()[:60]
             out["bg"] = bg or None
+
+        if "ПАУЗЫ" in sec:                                   # ПАУЗЫ: да  = резать паузы/паразитов/дубли (по умолчанию клип уже смонтирован: нет)
+            v = sec["ПАУЗЫ"].split("\n")[0].strip().lower()
+            out["cuts"] = bool(re.match(r"(да|д|yes|y|1|вкл|включ|резать|режь|убрать|убери)", v))
+        if "СКОРОСТЬ" in sec:                                # СКОРОСТЬ: 1.2  (по умолчанию 1.0 = без ускорения)
+            m_ = re.search(r"\d+(?:[.,]\d+)?", sec["СКОРОСТЬ"].split("\n")[0])
+            if m_:
+                sp = float(m_.group(0).replace(",", "."))
+                if sp < 1.0 or sp > 1.5:
+                    out["warnings"].append(f"speed {sp} out of 1.0-1.5, clamped")
+                out["speed"] = round(min(1.5, max(1.0, sp)), 2)
+        if "ВЕРСИИ" in sec:                                  # ВЕРСИИ: 1,3  или V1 V3
+            nums = sorted({int(x) for x in re.findall(r"[1-5]", sec["ВЕРСИИ"].split("\n")[0])})
+            out["versions"] = [f"V{n}" for n in nums]
     except Exception as e:  # noqa
-        out = {"hooks": [], "triggers": [], "bg": None, "warnings": [f"caption parse error: {type(e).__name__}"]}
+        out = {"hooks": [], "triggers": [], "bg": None, "warnings": [f"caption parse error: {type(e).__name__}"],
+               "cuts": False, "speed": 1.0, "versions": []}
     return out
 
 
@@ -127,7 +142,10 @@ def main():
     out = Path(sys.argv[1] if len(sys.argv) > 1 else "caption.json")
     cap = parse(os.environ.get("CAPTION", ""))
     out.write_text(json.dumps(cap, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"[caption] hooks={len(cap['hooks'])} triggers={len(cap['triggers'])} bg={'yes' if cap['bg'] else 'no'} warnings={len(cap['warnings'])}")
+    if len(sys.argv) > 2:                                  # --env FILE: SPEED_OVERRIDE / CUTS_ON для следующих шагов workflow
+        with open(sys.argv[2], "a", encoding="utf-8") as f:
+            f.write(f"SPEED_OVERRIDE={cap['speed']}\nCUTS_ON={'1' if cap['cuts'] else '0'}\n")
+    print(f"[caption] cuts={'on' if cap['cuts'] else 'off'} speed={cap['speed']} versions={','.join(cap['versions']) or 'all'} hooks={len(cap['hooks'])} triggers={len(cap['triggers'])} bg={'yes' if cap['bg'] else 'no'} warnings={len(cap['warnings'])}")
 
 
 if __name__ == "__main__":

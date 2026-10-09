@@ -108,6 +108,12 @@ def check_captions(plan, words):
     hook = plan.get("hook", {})
     ht = len((hook.get("text") or "").split())
     res.append(("hook <= 6 words", 1 <= ht <= 6, f"{ht} words: «{hook.get('text','')}»"))
+    if hook.get("from_caption"):
+        res.append(("hook self-check (not a fragment, no loose ending, grounded)", True, "hook given by the user in the caption — not checked"))
+    else:
+        import hookcheck
+        pr = hookcheck.problems(hook.get("text", ""), [w["w"] for w in words])
+        res.append(("hook self-check (not a fragment, no loose ending, grounded)", not pr, "; ".join(pr) or "ok"))
     return res
 
 
@@ -224,6 +230,9 @@ def cmd_report(a):
         pj = next(iter(d.rglob(f"plan_{v}.json")), None)
         if pj:
             pl_ = load_json(pj)
+            hk_ = pl_.get("hook", {})
+            if hk_.get("why"):
+                lines.append(f"- Hook idea: {hk_.get('promise', '')} — {hk_['why']}  (planner check: {hk_.get('check', 'n/a')})")
             lines.append(f"- Hook ({pl_.get('source')}): «{pl_.get('hook', {}).get('text', '')}»"
                          + (f"  — PLAN FALLBACK: {pl_['fallback_reason']}" if pl_.get("fallback_reason") else ""))
             if pl_.get("caption_match"):

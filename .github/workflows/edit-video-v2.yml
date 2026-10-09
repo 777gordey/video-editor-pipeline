@@ -78,8 +78,12 @@ jobs:
         id: v
         env:
           REQ: ${{ github.event.inputs.versions }}
+          CAPTION: ${{ github.event.client_payload.caption || github.event.inputs.caption }}
         run: |
           REQ="${REQ:-V1,V2,V3,V4,V5}"
+          # caption line «ВЕРСИИ: 1,3» overrides the list (bad caption = ignored)
+          CV=$(PYTHONPATH=engine python3 -c "import os,caption;print(','.join(caption.parse(os.environ.get('CAPTION',''))['versions']))" 2>/dev/null || true)
+          [ -n "$CV" ] && REQ="$CV"
           echo "versions=$(python3 -c "import json,sys;print(json.dumps([x.strip().upper() for x in sys.argv[1].split(',') if x.strip()]))" "$REQ")" >> "$GITHUB_OUTPUT"
           if [ "$REQ" = "V1" ]; then echo "needs_matte=false" >> "$GITHUB_OUTPUT"; else echo "needs_matte=true" >> "$GITHUB_OUTPUT"; fi
 
@@ -137,7 +141,7 @@ jobs:
           CAPTION: ${{ github.event.client_payload.caption || github.event.inputs.caption }}
         run: |
           mkdir -p out
-          python engine/caption.py out/caption.json || echo '{"hooks":[],"triggers":[],"bg":null,"warnings":["parse failed"]}' > out/caption.json
+          python engine/caption.py out/caption.json "$GITHUB_ENV" || echo '{"hooks":[],"triggers":[],"bg":null,"warnings":["parse failed"]}' > out/caption.json
 
       - name: Prep (normalize, transcribe, cut, speed up)
         env:
