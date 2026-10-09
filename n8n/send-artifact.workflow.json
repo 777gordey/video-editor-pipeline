@@ -1,0 +1,385 @@
+{
+  "name": "Video pipeline: send one artifact (v2 helper)",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "cf09db29-a784-4efe-8ea0-4f811451d014",
+      "name": "When called",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/artifacts/{{$json.artifact_id}}/zip",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "6e62377f-1b39-419d-8bd7-e691f1e880d4",
+      "name": "Get artifact download URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.headers.location}}",
+        "authentication": "none",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
+          "timeout": 900000
+        }
+      },
+      "id": "fd2b8c42-59a4-4ad1-8b6b-1b49ae86bd77",
+      "name": "Download artifact zip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "decompress",
+        "fileName": "data"
+      },
+      "id": "f75ffb46-e47c-4dd8-947a-7fc41d075f01",
+      "name": "Unzip",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const args = $('When called').first().json;\nconst item = $input.first();\nconst byName = {};\nfor (const b of Object.values(item.binary || {})) byName[b.fileName] = b;\nconst NAMES = {V1:'V1 Bold Yellow',V2:'V2 Neon ADHD',V3:'V3 Editorial',V4:'V4 Chrome 3D',V5:'V5 Soft Pastel'};\nconst out = [];\nif (args.mode === 'docs') {\n  for (const v of ['V1','V2','V3','V4','V5']) {\n    if (byName['cover_' + v + '.jpg']) out.push({ json: { kind: 'photo', caption: NAMES[v] + ' — обложка' }, binary: { data: byName['cover_' + v + '.jpg'] } });\n  }\n  for (const [fn, cap] of [['cuts.md', 'cuts.md — что вырезано и ускорено'], ['QA_report.md', 'QA_report.md — автопроверка всех версий']]) {\n    if (byName[fn]) out.push({ json: { kind: 'doc', caption: cap }, binary: { data: byName[fn] } });\n  }\n} else {\n  const v = args.version;\n  const video = byName['final_' + v + '.mp4'];\n  if (!video) throw new Error('final_' + v + '.mp4 not found in artifact; got: ' + Object.keys(byName).join(', '));\n  out.push({ json: { kind: 'video', caption: NAMES[v] }, binary: { data: video } });\n}\nif (!out.length) throw new Error('nothing to send for ' + JSON.stringify(args));\nreturn out;"
+      },
+      "id": "c3c926f5-862c-4621-9005-f2876927f38c",
+      "name": "Pick files by name",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "df160263-2836-4bdd-94b8-9321f30c2f2f",
+              "leftValue": "={{$json.kind === 'video'}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "51da5ef9-8cfe-4644-9cd4-718895801f20",
+      "name": "Is video?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "51302619-0a29-4979-864b-c71b5d4762ba",
+              "leftValue": "={{$json.kind === 'photo'}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "72b928b3-bc62-49ae-8fdb-cb915eaff3c1",
+      "name": "Is photo?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{$('When called').first().json.chat_id}}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{$json.caption}}"
+        }
+      },
+      "id": "38e07e7a-e3a8-47c4-836c-3d8455953bad",
+      "name": "Send video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        -120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{$('When called').first().json.chat_id}}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{$json.caption}}"
+        }
+      },
+      "id": "67f36187-977e-4af3-9256-c510f17d4e29",
+      "name": "Send cover",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        60
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "operation": "sendDocument",
+        "chatId": "={{$('When called').first().json.chat_id}}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{$json.caption}}"
+        }
+      },
+      "id": "1f6c1894-17d9-48c7-af68-d6d3a2d5126e",
+      "name": "Send document",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        200
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true } }];"
+      },
+      "id": "9a45024d-77dc-400c-9f95-e74417114892",
+      "name": "Done (no binary)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When called": {
+      "main": [
+        [
+          {
+            "node": "Get artifact download URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get artifact download URL": {
+      "main": [
+        [
+          {
+            "node": "Download artifact zip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download artifact zip": {
+      "main": [
+        [
+          {
+            "node": "Unzip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip": {
+      "main": [
+        [
+          {
+            "node": "Pick files by name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick files by name": {
+      "main": [
+        [
+          {
+            "node": "Is video?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is video?": {
+      "main": [
+        [
+          {
+            "node": "Send video",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is photo?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is photo?": {
+      "main": [
+        [
+          {
+            "node": "Send cover",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send video": {
+      "main": [
+        [
+          {
+            "node": "Done (no binary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send cover": {
+      "main": [
+        [
+          {
+            "node": "Done (no binary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send document": {
+      "main": [
+        [
+          {
+            "node": "Done (no binary)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -6,3 +6,9 @@ videos/
 n8n_inspect*.json
 __pycache__/
 *.pyc
+engine/node_modules/
+engine/__pycache__/
+work/
+out/
+prep/
+.claude/

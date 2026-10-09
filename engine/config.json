@@ -1,0 +1,12 @@
+{
+  "SPEED": 1.0,
+  "FPS": 30,
+  "WIDTH": 1080,
+  "HEIGHT": 1920,
+  "AUDIO_RATE": 48000,
+  "LOUDNESS_LUFS": -14,
+  "notes": "SPEED applies after cuts, to video+audio together (atempo + setpts, pitch preserved). All word times in transcript.json are divided by SPEED so every later layer lives on the FINAL timeline. Music and ambience are added after the speed-up and are not sped up.",
+  "PLAN_MODEL": "opus",
+  "PLAN_MAX_TURNS": 3,
+  "PLAN_TIMEOUT_SEC": 600
+}

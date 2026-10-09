@@ -1,0 +1,9 @@
+{
+  "name": "reels-engine-v2",
+  "private": true,
+  "version": "2.0.0",
+  "description": "HyperFrames pin for the edit-video-v2 workflow",
+  "dependencies": {
+    "hyperframes": "0.8.129"
+  }
+}
