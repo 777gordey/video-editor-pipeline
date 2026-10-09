@@ -115,7 +115,7 @@ def plan_correction(m):
         info["applied"].append(f"denoise gentle (sigma {sigma:.1f})")
     lifted = gamma < 0.97
     if lifted or (m["p98"] - m["p02"] < 0.55):
-        filters.append("unsharp=luma_msize_x=31:luma_msize_y=31:luma_amount=0.18:chroma_amount=0")   # mild local contrast
+        filters.append("unsharp=luma_msize_x=23:luma_msize_y=23:luma_amount=0.18:chroma_amount=0")   # mild local contrast
         info["applied"].append("mild local contrast")
     if denoised or lifted:
         filters.append("unsharp=5:5:0.35:5:5:0")              # slight sharpen after denoise

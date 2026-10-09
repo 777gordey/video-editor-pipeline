@@ -350,6 +350,12 @@ def main():
     except Exception as e:  # noqa
         print(f"EXPOSURE SKIPPED: {type(e).__name__}: {str(e)[:200]}", flush=True)
         em, exp_filter, einfo = {}, "", {"applied": [], "error": str(e)[:200]}
+    if exp_filter:      # фильтр не должен ронять прогон: проверяем на одном кадре
+        t_ = subprocess.run(["ffmpeg", "-v", "error", "-i", str(norm_mp4), "-frames:v", "1", "-vf", exp_filter, "-f", "null", "-"],
+                            capture_output=True, text=True)
+        if t_.returncode != 0:
+            print(f"EXPOSURE FILTER INVALID, skipped: {t_.stderr[-200:]}", flush=True)
+            exp_filter, einfo = "", {"applied": [], "error": "invalid filter"}
     log(f"[prep] exposure before={em} filter={exp_filter or 'none'}")
     render_cut_speed(norm_mp4, segs, prepped, exp_filter)
     try:
