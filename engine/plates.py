@@ -1,6 +1,7 @@
 """Фоновые «плейты» только из свободных источников: brand/plates/ и Pexels API
 (ключ PEXELS_API_KEY из GitHub Secrets, не печатается). Никаких AI-сцен.
 Нет ни файла, ни ключа — возвращаем None и печатаем "PLATE FALLBACK: ..."; compose рисует CSS-градиент."""
+import subprocess
 import os
 import re
 from pathlib import Path
@@ -81,13 +82,20 @@ def prepare_plate(style, dur, out: Path, cache: Path):
     if not src:
         return None
     # зацикливаем «пинг-понгом» (вперёд-назад), чтобы не было видимого шва
-    vf = (f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={FPS},"
+    trc = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=color_transfer",
+                          "-of", "csv=p=0", str(src)], capture_output=True, text=True).stdout.strip()
+    hdr = trc in ("smpte2084", "arib-std-b67")          # HDR-плейт включает у HyperFrames медленный HDR-путь (0.7 кадр/с) — приводим к SDR
+    log(f"[plate] source transfer={trc or '?'} hdr={hdr}")
+    tm = ("zscale=t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,") if hdr else ""
+    vf = (tm + f"scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},fps={FPS},"
           f"split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0,format=yuv420p")
     one = out.with_suffix(".pp.mp4")
     run(["ffmpeg", "-y", "-loglevel", "error", "-t", "12", "-i", src, "-an", "-filter_complex",
-         "[0:v]" + vf + "[o]", "-map", "[o]", "-c:v", "libx264", "-preset", "fast", "-crf", 17, one])
+         "[0:v]" + vf + "[o]", "-map", "[o]", "-c:v", "libx264", "-preset", "fast", "-crf", 17,
+         "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", one])
     run(["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", "-1", "-i", one, "-t", f"{dur:.3f}", "-an",
          "-vf", f"{style['plate_grade']}" if style.get("plate_grade") else "null",
-         "-c:v", "libx264", "-preset", "fast", "-crf", 17, "-r", FPS, out])
+         "-c:v", "libx264", "-preset", "fast", "-crf", 17, "-r", FPS,
+         "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709", out])
     one.unlink(missing_ok=True)
     return out
