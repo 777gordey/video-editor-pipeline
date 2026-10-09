@@ -25,6 +25,10 @@ on:
         description: "Test only: Telegram caption (ХУКИ / ТРИГГЕРЫ / ФОН)"
         required: false
         default: ""
+      source_run:
+        description: "Test only: run id whose `prep` artifact (prepped.mp4) is reused as the source clip"
+        required: false
+        default: ""
       loop:
         description: "Test only: repeat the source N times (2 = long-clip stress test)"
         required: false
@@ -32,6 +36,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   HYPERFRAMES_NO_TELEMETRY: "1"
@@ -109,11 +114,17 @@ jobs:
       - name: Download source
         env:
           VIDEO_URL: ${{ github.event.client_payload.video_url || github.event.inputs.video_url || secrets.TEST_VIDEO_URL }}
+          SOURCE_RUN: ${{ github.event.inputs.source_run }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -n "$SOURCE_RUN" ]; then
+            gh run download "$SOURCE_RUN" -R "$GITHUB_REPOSITORY" -n prep -D src_prep && cp src_prep/prepped.mp4 source.mp4
+          else
           [ "$VIDEO_URL" = "selftest" ] || echo "::add-mask::$VIDEO_URL"
           test -n "$VIDEO_URL" || { echo "no video url"; exit 1; }
           if [ "$VIDEO_URL" = "selftest" ]; then bash engine/selftest.sh source.mp4; else
             curl -sS -f -L --retry 3 "$VIDEO_URL" -o source.mp4; fi
+          fi
           test -s source.mp4
           L="${{ github.event.inputs.loop }}"
           if [ -n "$L" ] && [ "$L" -gt 1 ] 2>/dev/null; then
