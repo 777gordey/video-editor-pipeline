@@ -81,7 +81,7 @@ def build_prompt(tr, with_cuts=False) -> str:
 {briefs}
 
 Для каждой версии (ключи V1..V5):
-- hook: {{first,last}} — подряд идущие слова ИЗ ТРАНСКРИПТА (last-first<=5, максимум 6 слов), слова не менять. Цепляющий
+- hook: {{first,last}} — подряд идущие слова ИЗ ТРАНСКРИПТА (last-first<=5, максимум 6 слов), слова не менять; слова должны быть из первых ~15 секунд речи (время начала предложения указано как @сек). Цепляющий
   заголовок под угол версии. Хуки разных версий должны ОТЛИЧАТЬСЯ.
 - emphasis: idx ключевых слов для выделения в субтитрах (примерно каждое 8-е слово; в «спокойных» версиях V3/V5 реже).
 - graphics: события графики, привязанные к слову-триггеру (word = idx). kind: globe (мир/страны/интернет/масштаб),
@@ -97,7 +97,7 @@ def words_txt(tr, drop=None) -> str:
     w = tr["words"]
     drop = drop or {}
     tok = lambda k: (f"~{k}:{w[k]['w']}~" if k in drop else f"{k}:{w[k]['w']}")
-    return chr(10).join(f"[{s['id']}] " + " ".join(tok(k) for k in range(s["first"], s["last"] + 1))
+    return chr(10).join(f"[{s['id']}{' @%.0fs' % s['t'] if 't' in s else ''}] " + " ".join(tok(k) for k in range(s["first"], s["last"] + 1))
                      for s in tr["sentences"])
 
 
@@ -142,7 +142,7 @@ def plan_raw(words, sents, drop, dur):
     """Один вызов Claude на СЫРОМ транскрипте (до нарезки): выборы для V1..V5 + вырезы (cuts) в индексах сырых слов.
     Возвращает dict или {"_fallback": причина} (с громкой строкой PLAN FALLBACK)."""
     tr = {"duration": dur, "words": [{"w": w["w"]} for w in words],
-          "sentences": [{"id": n, "first": s_[0], "last": s_[-1]} for n, s_ in enumerate(sents)]}
+          "sentences": [{"id": n, "first": s_[0], "last": s_[-1], "t": words[s_[0]]["start"]} for n, s_ in enumerate(sents)]}
     model = os.environ.get("PLAN_MODEL") or CONFIG.get("PLAN_MODEL", "opus")
     try:
         if not os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"):
@@ -156,6 +156,8 @@ def plan_raw(words, sents, drop, dur):
                     *(s_["word"] for s_ in ch["sfx"])]
             if any(i >= n for i in idxs):
                 raise ValueError(f"{v}: индекс слова вне транскрипта")
+            if words[ch["hook"]["first"]]["start"] > 25:
+                print(f"PLAN WARNING: {v} hook starts at {words[ch['hook']['first']]['start']:.0f}s of raw speech (expected <15s)", flush=True)
         for c_ in data.get("cuts", []):
             if c_["first"] > c_["last"] or c_["last"] >= n:
                 raise ValueError("cuts: плохой диапазон")

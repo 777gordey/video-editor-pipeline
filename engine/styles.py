@@ -3,7 +3,7 @@
 STYLES = {
     "V1": dict(
         id="V1", name="Bold Yellow",
-        angle="Прямое смелое утверждение / обещание результата — коротко, как удар.",
+        angle="ПРОТИВОРЕЧИВОЕ утверждение (contrarian claim): идёт против привычного мнения, коротко, как удар.",
         bg="room", matte=False, plate_query=None, ambience=None, music_idx=0,
         font="Montserrat", font_weight=900, caps=True, cap_size=118, cap_words=3,
         colors=dict(text="#FFFFFF", emph="#FFD400", stroke="#000000", accent="#FFD400"),
@@ -14,7 +14,7 @@ STYLES = {
     ),
     "V2": dict(
         id="V2", name="Neon ADHD",
-        angle="Провокационный вопрос или «стоп-кадр» — зацепить любопытством, быстрый ритм.",
+        angle="ВОПРОС (question): провокационный вопрос зрителю, зацепить любопытством.",
         bg="plate", matte=True, plate_query="city center crowd street portrait", ambience="crowd", music_idx=1,
         font="Unbounded", font_weight=900, caps=True, cap_size=88, cap_words=2,
         colors=dict(text="#FFFFFF", emph="#00F5FF", stroke="#1A0033", accent="#FF2BD6"),
@@ -25,7 +25,7 @@ STYLES = {
     ),
     "V3": dict(
         id="V3", name="Editorial",
-        angle="Спокойная мысль-цитата: основная идея одной зрелой фразой.",
+        angle="РЕЗУЛЬТАТ СРАЗУ (result first): итог/выгода в первой фразе, спокойно, одной зрелой фразой.",
         bg="plate", matte=True, plate_query="pine forest sunlight trees portrait", ambience="birds", music_idx=2,
         font="Playfair Display", font_weight=700, caps=False, cap_size=84, cap_words=4,
         colors=dict(text="#F6EEDF", emph="#E8B86A", stroke="#1B140C", accent="#E8B86A"),
@@ -36,7 +36,7 @@ STYLES = {
     ),
     "V4": dict(
         id="V4", name="Chrome 3D",
-        angle="Цифра, факт или чёткий «результат» — как заголовок технологичного ролика.",
+        angle="ЦИФРА + ВРЕМЯ (number+time): конкретное число и срок («за 3 дня», «в 2 раза»), как заголовок.",
         bg="studio", matte=True, plate_query=None, ambience=None, music_idx=3, globe_behind=True,
         font="Russo One", font_weight=400, caps=True, cap_size=100, cap_words=3,
         colors=dict(text="#E9EEF5", emph="#4DA3FF", stroke="#05070D", accent="#4DA3FF"),
@@ -47,7 +47,7 @@ STYLES = {
     ),
     "V5": dict(
         id="V5", name="Soft Pastel",
-        angle="Мягкое обещание/эмпатия — «вот что тебе станет проще», без давления.",
+        angle="БОЛЬ (pain): узнаваемая проблема зрителя, сказанная мягко и с эмпатией.",
         bg="plate", matte=True, plate_query="cozy house birds garden spring portrait", ambience="birds", music_idx=4,
         font="Nunito", font_weight=900, caps=False, cap_size=86, cap_words=4,
         colors=dict(text="#4B3A5A", emph="#FF6F91", stroke="#FFFFFF", accent="#FF9EB5"),
