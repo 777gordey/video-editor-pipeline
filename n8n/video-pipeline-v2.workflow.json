@@ -1,1117 +1,1123 @@
 {
- "name": "Video pipeline v2: Telegram -> GitHub Actions -> Telegram",
- "nodes": [
-  {
-   "parameters": {
-    "updates": [
-     "message"
-    ]
-   },
-   "id": "tg-trigger",
-   "name": "Telegram Trigger",
-   "type": "n8n-nodes-base.telegramTrigger",
-   "typeVersion": 1.1,
-   "position": [
-    0,
-    0
-   ],
-   "webhookId": "__WEBHOOK_ID__",
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{$json.message.from.id}}",
-       "rightValue": "={{ Number($env.ALLOWED_USER_ID) }}",
-       "operator": {
-        "type": "number",
-        "operation": "equals"
-       }
-      }
-     ],
-     "combinator": "and"
-    }
-   },
-   "id": "if-allowed-user",
-   "name": "Owner only?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    220,
-    0
-   ]
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{$json.message.video}}",
-       "rightValue": "",
-       "operator": {
-        "type": "object",
-        "operation": "exists",
-        "singleValue": true
-       }
+  "name": "Video pipeline v2: Telegram -> GitHub Actions -> Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ]
       },
-      {
-       "leftValue": "={{$json.message.video?.duration}}",
-       "rightValue": 300,
-       "operator": {
-        "type": "number",
-        "operation": "lte"
-       }
+      "id": "tg-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "__WEBHOOK_ID__",
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
       }
-     ],
-     "combinator": "and"
     },
-    "looseTypeValidation": true
-   },
-   "id": "if-valid-video",
-   "name": "Video and <=5min?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    440,
-    -40
-   ]
-  },
-  {
-   "parameters": {
-    "chatId": "={{$json.message.chat.id}}",
-    "text": "Принимаются только видео до 5 минут, отправленные владельцем. Пришлите видео покороче.",
-    "additionalFields": {}
-   },
-   "id": "tg-reject",
-   "name": "Reject",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    660,
-    120
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "=http://telegram-bot-api:8081/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile?file_id={{$json.message.video.file_id}}",
-    "options": {
-     "timeout": 600000
-    }
-   },
-   "id": "http-getfile",
-   "name": "Telegram getFile",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    660,
-    -40
-   ]
-  },
-  {
-   "parameters": {
-    "assignments": {
-     "assignments": [
-      {
-       "id": "video_url",
-       "name": "video_url",
-       "type": "string",
-       "value": "=https://gordey1-bot.duckdns.org/vf/__VF_SECRET__/{{ $json.result.file_path.split('/').pop() }}"
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.message.from.id}}",
+              "rightValue": "={{ Number($env.ALLOWED_USER_ID) }}",
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
       },
-      {
-       "id": "chat_id",
-       "name": "chat_id",
-       "type": "string",
-       "value": "={{$('Telegram Trigger').item.json.message.chat.id}}"
-      },
-      {
-       "id": "dispatch_ts",
-       "name": "dispatch_ts",
-       "type": "string",
-       "value": "={{$now.toISO()}}"
-      }
-     ]
-    }
-   },
-   "id": "set-video-url",
-   "name": "Build video_url",
-   "type": "n8n-nodes-base.set",
-   "typeVersion": 3.4,
-   "position": [
-    880,
-    -40
-   ]
-  },
-  {
-   "parameters": {
-    "method": "POST",
-    "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/dispatches",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "githubApi",
-    "sendHeaders": true,
-    "headerParameters": {
-     "parameters": [
-      {
-       "name": "Accept",
-       "value": "application/vnd.github+json"
-      }
-     ]
+      "id": "if-allowed-user",
+      "name": "Owner only?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ]
     },
-    "sendBody": true,
-    "specifyBody": "json",
-    "jsonBody": "={{ { \"event_type\": $json.event_type, \"client_payload\": { \"video_url\": $json.video_url } } }}",
-    "options": {}
-   },
-   "id": "http-dispatch",
-   "name": "Trigger GitHub Action",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    1100,
-    -40
-   ],
-   "credentials": {
-    "githubApi": {
-     "id": "__GITHUB_CRED_ID__",
-     "name": "GitHub Token (repo scope)"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "amount": 15,
-    "unit": "seconds"
-   },
-   "id": "wait-initial",
-   "name": "Wait for run to appear",
-   "type": "n8n-nodes-base.wait",
-   "typeVersion": 1.1,
-   "position": [
-    1320,
-    -40
-   ],
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/workflows/{{$('Pipeline config').first().json.workflow_file}}/runs?event=repository_dispatch&per_page=5",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "githubApi",
-    "options": {}
-   },
-   "id": "http-find-run",
-   "name": "Find run",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    1540,
-    -40
-   ],
-   "credentials": {
-    "githubApi": {
-     "id": "__GITHUB_CRED_ID__",
-     "name": "GitHub Token (repo scope)"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "jsCode": "const dispatchTs = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst runs = $input.first().json.workflow_runs || [];\nconst match = runs.find(r => new Date(r.created_at).getTime() >= dispatchTs - 5000);\nif (!match) {\n  return [{ json: { found: false, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];\n}\nreturn [{ json: { found: true, run_id: match.id, status: match.status, conclusion: match.conclusion, html_url: match.html_url, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];"
-   },
-   "id": "code-pick-run",
-   "name": "Pick matching run",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1760,
-    -40
-   ]
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{$json.found}}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "true"
-       }
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.message.video}}",
+              "rightValue": "",
+              "operator": {
+                "type": "object",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "leftValue": "={{$json.message.video?.duration}}",
+              "rightValue": 300,
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true
       },
-      {
-       "leftValue": "={{$json.status}}",
-       "rightValue": "completed",
-       "operator": {
-        "type": "string",
-        "operation": "equals"
-       }
-      }
-     ],
-     "combinator": "and"
-    }
-   },
-   "id": "if-completed",
-   "name": "Run completed?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    1980,
-    -40
-   ]
-  },
-  {
-   "parameters": {
-    "jsCode": "const started = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst lim = $('Pipeline config').first().json.timeout_min;\nconst elapsedMin = (Date.now() - started) / 60000;\nreturn [{ json: { elapsedMin, timedOut: elapsedMin > lim, limit: lim } }];"
-   },
-   "id": "code-check-timeout",
-   "name": "Check timeout",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    1980,
-    160
-   ]
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{$json.timedOut}}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "true"
-       }
-      }
-     ],
-     "combinator": "and"
-    }
-   },
-   "id": "if-timed-out",
-   "name": "Timed out?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    2200,
-    160
-   ]
-  },
-  {
-   "parameters": {
-    "chatId": "={{$('Build video_url').first().json.chat_id}}",
-    "text": "=Обработка заняла больше {{$('Check timeout').first().json.limit}} минут и остановлена в ожидании. Лог запуска: {{$('Pick matching run').first().json.html_url || 'https://github.com/' + $env.GITHUB_OWNER + '/' + $env.GITHUB_REPO + '/actions'}}",
-    "additionalFields": {}
-   },
-   "id": "tg-timeout",
-   "name": "Notify timeout",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    2420,
-    220
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "amount": 45,
-    "unit": "seconds"
-   },
-   "id": "wait-poll",
-   "name": "Wait 45s",
-   "type": "n8n-nodes-base.wait",
-   "typeVersion": 1.1,
-   "position": [
-    2420,
-    60
-   ],
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "leftValue": "={{$json.conclusion}}",
-       "rightValue": "success",
-       "operator": {
-        "type": "string",
-        "operation": "equals"
-       }
-      }
-     ],
-     "combinator": "and"
-    }
-   },
-   "id": "if-success",
-   "name": "Success?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    2200,
-    -120
-   ],
-   "notesInFlow": true
-  },
-  {
-   "parameters": {
-    "chatId": "={{$('Build video_url').first().json.chat_id}}",
-    "text": "=Обработка видео завершилась с ошибкой. Лог запуска: {{$json.html_url}}",
-    "additionalFields": {}
-   },
-   "id": "tg-failure",
-   "name": "Notify failure",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    2420,
-    -220
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/runs/{{$json.run_id}}/artifacts",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "githubApi",
-    "options": {}
-   },
-   "id": "http-list-artifacts",
-   "name": "List artifacts",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2640,
-    20
-   ],
-   "credentials": {
-    "githubApi": {
-     "id": "__GITHUB_CRED_ID__",
-     "name": "GitHub Token (repo scope)"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/artifacts/{{$json.artifacts[0].id}}/zip",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "githubApi",
-    "options": {
-     "redirect": {
-      "redirect": {
-       "followRedirects": false
-      }
-     },
-     "response": {
-      "response": {
-       "fullResponse": true,
-       "neverError": true
-      }
-     }
-    }
-   },
-   "id": "http-get-artifact-redirect",
-   "name": "Get artifact download URL",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2860,
-    20
-   ],
-   "credentials": {
-    "githubApi": {
-     "id": "__GITHUB_CRED_ID__",
-     "name": "GitHub Token (repo scope)"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "={{$json.headers.location}}",
-    "authentication": "none",
-    "options": {
-     "response": {
-      "response": {
-       "responseFormat": "file"
-      }
-     }
-    }
-   },
-   "id": "http-download-artifact",
-   "name": "Download artifact zip",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    3080,
-    20
-   ]
-  },
-  {
-   "parameters": {
-    "operation": "decompress",
-    "fileName": "data"
-   },
-   "id": "unzip-artifact",
-   "name": "Unzip",
-   "type": "n8n-nodes-base.compression",
-   "typeVersion": 1.1,
-   "position": [
-    3300,
-    20
-   ]
-  },
-  {
-   "parameters": {
-    "mode": "runOnceForAllItems",
-    "language": "javaScript",
-    "jsCode": "const item = $input.first();\nconst byName = {};\nfor (const b of Object.values(item.binary || {})) byName[b.fileName] = b;\nconst video = byName['final.mp4'];\nif (!video) throw new Error('final.mp4 not found in artifact; got: ' + Object.keys(byName).join(', '));\nconst binary = { video };\nif (byName['thumbnail_1080x1920.jpg']) binary.cover = byName['thumbnail_1080x1920.jpg'];\nreturn [{ json: { hasCover: !!binary.cover }, binary }];\n"
-   },
-   "id": "code-pick-by-name",
-   "name": "Pick files by name",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    3520,
-    20
-   ]
-  },
-  {
-   "parameters": {
-    "operation": "sendVideo",
-    "chatId": "={{$('Build video_url').first().json.chat_id}}",
-    "binaryData": true,
-    "binaryPropertyName": "video",
-    "additionalFields": {}
-   },
-   "id": "tg-send-video",
-   "name": "Send video",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    3740,
-    20
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__"
-  },
-  {
-   "parameters": {
-    "operation": "sendPhoto",
-    "chatId": "={{$('Build video_url').first().json.chat_id}}",
-    "binaryData": true,
-    "binaryPropertyName": "cover",
-    "additionalFields": {}
-   },
-   "id": "tg-send-cover",
-   "name": "Send cover",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    3960,
-    20
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__",
-   "onError": "continueRegularOutput"
-  },
-  {
-   "parameters": {
-    "includeOtherFields": true,
-    "assignments": {
-     "assignments": [
-      {
-       "id": "2dcfd911-f5c7-4387-ad3b-7a9fd612c9e8",
-       "name": "use_v2",
-       "type": "boolean",
-       "value": true
-      }
-     ]
-    }
-   },
-   "id": "229c00db-3e0f-4fe1-845a-7b5b6c3d9c19",
-   "name": "Pipeline switch (use_v2)",
-   "type": "n8n-nodes-base.set",
-   "typeVersion": 3.4,
-   "position": [
-    880,
-    -140
-   ]
-  },
-  {
-   "parameters": {
-    "includeOtherFields": true,
-    "assignments": {
-     "assignments": [
-      {
-       "id": "59e59e2b-f53b-482a-8870-cf5b6e4fc86d",
-       "name": "event_type",
-       "type": "string",
-       "value": "={{$json.use_v2 ? 'edit-video-v2' : 'process-video'}}"
-      },
-      {
-       "id": "020ec318-d864-4518-aa08-cc59efce79b2",
-       "name": "workflow_file",
-       "type": "string",
-       "value": "={{$json.use_v2 ? 'edit-video-v2.yml' : 'edit-video.yml'}}"
-      },
-      {
-       "id": "76a23a43-1420-4fc9-adb9-93aaac956f8a",
-       "name": "timeout_min",
-       "type": "number",
-       "value": "={{$json.use_v2 ? 60 : 10}}"
-      }
-     ]
-    }
-   },
-   "id": "0126fdd2-60a3-41b6-acf6-a9b219673ca3",
-   "name": "Pipeline config",
-   "type": "n8n-nodes-base.set",
-   "typeVersion": 3.4,
-   "position": [
-    1100,
-    -140
-   ]
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "id": "6e7c4197-c6dc-4d4c-b703-f106f18cd048",
-       "leftValue": "={{$('Pipeline config').first().json.use_v2}}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "true"
-       }
-      }
-     ],
-     "combinator": "and"
-    }
-   },
-   "id": "52580bf5-46b5-42ef-8f2f-9cf540059ee8",
-   "name": "Use v2?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    2420,
-    -250
-   ]
-  },
-  {
-   "parameters": {
-    "method": "GET",
-    "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/runs/{{$json.run_id}}/artifacts?per_page=100",
-    "authentication": "predefinedCredentialType",
-    "nodeCredentialType": "githubApi",
-    "options": {}
-   },
-   "id": "32562c96-9024-4df3-9667-b9ab29948524",
-   "name": "List run artifacts",
-   "type": "n8n-nodes-base.httpRequest",
-   "typeVersion": 4.2,
-   "position": [
-    2640,
-    -250
-   ],
-   "credentials": {
-    "githubApi": {
-     "id": "__GITHUB_CRED_ID__",
-     "name": "GitHub Token (repo scope)"
-    }
-   }
-  },
-  {
-   "parameters": {
-    "jsCode": "const run = $('Pick matching run').first().json;\nconst arts = ($input.first().json.artifacts || []).filter(a => !a.expired);\nconst byName = {};\nfor (const a of arts) byName[a.name] = a.id;\nconst chat = $('Build video_url').first().json.chat_id;\nconst out = [], missing = [];\nfor (const v of ['V1', 'V2', 'V3', 'V4', 'V5']) {\n  if (byName['version-' + v]) out.push({ json: { artifact_id: byName['version-' + v], mode: 'version', version: v, chat_id: chat } });\n  else missing.push(v);\n}\nif (byName['docs']) out.push({ json: { artifact_id: byName['docs'], mode: 'docs', version: '', chat_id: chat } });\nif (!out.length) throw new Error('no artifacts in run ' + run.html_url);\nout[0].json.missing = missing;\nout[0].json.run_url = run.html_url;\nreturn out;"
-   },
-   "id": "68cc855e-b88d-4e76-8a4d-aa1e749920a3",
-   "name": "Plan sends",
-   "type": "n8n-nodes-base.code",
-   "typeVersion": 2,
-   "position": [
-    2860,
-    -250
-   ]
-  },
-  {
-   "parameters": {
-    "source": "database",
-    "workflowId": {
-     "__rl": true,
-     "value": "__SUB_WORKFLOW_ID__",
-     "mode": "id"
+      "id": "if-valid-video",
+      "name": "Video and <=5min?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        -40
+      ]
     },
-    "mode": "each",
-    "options": {
-     "waitForSubWorkflow": true
-    }
-   },
-   "id": "75e0d3df-1662-426b-834e-01a8d858c6ec",
-   "name": "Send artifact (sub-workflow)",
-   "type": "n8n-nodes-base.executeWorkflow",
-   "typeVersion": 1.2,
-   "position": [
-    3080,
-    -250
-   ]
-  },
-  {
-   "parameters": {
-    "conditions": {
-     "options": {
-      "caseSensitive": true,
-      "leftValue": "",
-      "typeValidation": "strict"
-     },
-     "conditions": [
-      {
-       "id": "3ca5bc2e-f555-4bd0-9ecd-54addcb240ce",
-       "leftValue": "={{ ($('Plan sends').first().json.missing || []).length > 0 }}",
-       "rightValue": true,
-       "operator": {
-        "type": "boolean",
-        "operation": "true"
-       }
+    {
+      "parameters": {
+        "chatId": "={{$json.message.chat.id}}",
+        "text": "Принимаются только видео до 5 минут, отправленные владельцем. Пришлите видео покороче.",
+        "additionalFields": {}
+      },
+      "id": "tg-reject",
+      "name": "Reject",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        660,
+        120
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://telegram-bot-api:8081/bot{{$env.TELEGRAM_BOT_TOKEN}}/getFile?file_id={{$json.message.video.file_id}}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "http-getfile",
+      "name": "Telegram getFile",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "video_url",
+              "name": "video_url",
+              "type": "string",
+              "value": "=https://gordey1-bot.duckdns.org/vf/__VF_SECRET__/{{ $json.result.file_path.split('/').pop() }}"
+            },
+            {
+              "id": "chat_id",
+              "name": "chat_id",
+              "type": "string",
+              "value": "={{$('Telegram Trigger').item.json.message.chat.id}}"
+            },
+            {
+              "id": "dispatch_ts",
+              "name": "dispatch_ts",
+              "type": "string",
+              "value": "={{$now.toISO()}}"
+            },
+            {
+              "id": "caption",
+              "name": "caption",
+              "type": "string",
+              "value": "={{ String($('Telegram Trigger').item.json.message.caption || '').slice(0, 1500) }}"
+            }
+          ]
+        }
+      },
+      "id": "set-video-url",
+      "name": "Build video_url",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/dispatches",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { \"event_type\": $json.event_type, \"client_payload\": { \"video_url\": $json.video_url, \"caption\": $json.caption || \"\" } } }}",
+        "options": {}
+      },
+      "id": "http-dispatch",
+      "name": "Trigger GitHub Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -40
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
       }
-     ],
-     "combinator": "and"
+    },
+    {
+      "parameters": {
+        "amount": 15,
+        "unit": "seconds"
+      },
+      "id": "wait-initial",
+      "name": "Wait for run to appear",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        -40
+      ],
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/workflows/{{$('Pipeline config').first().json.workflow_file}}/runs?event=repository_dispatch&per_page=5",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-find-run",
+      "name": "Find run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -40
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const dispatchTs = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst runs = $input.first().json.workflow_runs || [];\nconst match = runs.find(r => new Date(r.created_at).getTime() >= dispatchTs - 5000);\nif (!match) {\n  return [{ json: { found: false, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];\n}\nreturn [{ json: { found: true, run_id: match.id, status: match.status, conclusion: match.conclusion, html_url: match.html_url, dispatch_ts: $('Build video_url').first().json.dispatch_ts } }];"
+      },
+      "id": "code-pick-run",
+      "name": "Pick matching run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.found}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            },
+            {
+              "leftValue": "={{$json.status}}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-completed",
+      "name": "Run completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const started = new Date($('Build video_url').first().json.dispatch_ts).getTime();\nconst lim = $('Pipeline config').first().json.timeout_min;\nconst elapsedMin = (Date.now() - started) / 60000;\nreturn [{ json: { elapsedMin, timedOut: elapsedMin > lim, limit: lim } }];"
+      },
+      "id": "code-check-timeout",
+      "name": "Check timeout",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1980,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.timedOut}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-timed-out",
+      "name": "Timed out?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$('Build video_url').first().json.chat_id}}",
+        "text": "=Обработка заняла больше {{$('Check timeout').first().json.limit}} минут и остановлена в ожидании. Лог запуска: {{$('Pick matching run').first().json.html_url || 'https://github.com/' + $env.GITHUB_OWNER + '/' + $env.GITHUB_REPO + '/actions'}}",
+        "additionalFields": {}
+      },
+      "id": "tg-timeout",
+      "name": "Notify timeout",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2420,
+        220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "amount": 45,
+        "unit": "seconds"
+      },
+      "id": "wait-poll",
+      "name": "Wait 45s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2420,
+        60
+      ],
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json.conclusion}}",
+              "rightValue": "success",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-success",
+      "name": "Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2200,
+        -120
+      ],
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "chatId": "={{$('Build video_url').first().json.chat_id}}",
+        "text": "=Обработка видео завершилась с ошибкой. Лог запуска: {{$json.html_url}}",
+        "additionalFields": {}
+      },
+      "id": "tg-failure",
+      "name": "Notify failure",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2420,
+        -220
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/runs/{{$json.run_id}}/artifacts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "http-list-artifacts",
+      "name": "List artifacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        20
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/artifacts/{{$json.artifacts[0].id}}/zip",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "http-get-artifact-redirect",
+      "name": "Get artifact download URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        20
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{$json.headers.location}}",
+        "authentication": "none",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "http-download-artifact",
+      "name": "Download artifact zip",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3080,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "decompress",
+        "fileName": "data"
+      },
+      "id": "unzip-artifact",
+      "name": "Unzip",
+      "type": "n8n-nodes-base.compression",
+      "typeVersion": 1.1,
+      "position": [
+        3300,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const item = $input.first();\nconst byName = {};\nfor (const b of Object.values(item.binary || {})) byName[b.fileName] = b;\nconst video = byName['final.mp4'];\nif (!video) throw new Error('final.mp4 not found in artifact; got: ' + Object.keys(byName).join(', '));\nconst binary = { video };\nif (byName['thumbnail_1080x1920.jpg']) binary.cover = byName['thumbnail_1080x1920.jpg'];\nreturn [{ json: { hasCover: !!binary.cover }, binary }];\n"
+      },
+      "id": "code-pick-by-name",
+      "name": "Pick files by name",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3520,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendVideo",
+        "chatId": "={{$('Build video_url').first().json.chat_id}}",
+        "binaryData": true,
+        "binaryPropertyName": "video",
+        "additionalFields": {}
+      },
+      "id": "tg-send-video",
+      "name": "Send video",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3740,
+        20
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "={{$('Build video_url').first().json.chat_id}}",
+        "binaryData": true,
+        "binaryPropertyName": "cover",
+        "additionalFields": {}
+      },
+      "id": "tg-send-cover",
+      "name": "Send cover",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3960,
+        20
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2dcfd911-f5c7-4387-ad3b-7a9fd612c9e8",
+              "name": "use_v2",
+              "type": "boolean",
+              "value": true
+            }
+          ]
+        }
+      },
+      "id": "229c00db-3e0f-4fe1-845a-7b5b6c3d9c19",
+      "name": "Pipeline switch (use_v2)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        880,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "59e59e2b-f53b-482a-8870-cf5b6e4fc86d",
+              "name": "event_type",
+              "type": "string",
+              "value": "={{$json.use_v2 ? 'edit-video-v2' : 'process-video'}}"
+            },
+            {
+              "id": "020ec318-d864-4518-aa08-cc59efce79b2",
+              "name": "workflow_file",
+              "type": "string",
+              "value": "={{$json.use_v2 ? 'edit-video-v2.yml' : 'edit-video.yml'}}"
+            },
+            {
+              "id": "76a23a43-1420-4fc9-adb9-93aaac956f8a",
+              "name": "timeout_min",
+              "type": "number",
+              "value": "={{$json.use_v2 ? 60 : 10}}"
+            }
+          ]
+        }
+      },
+      "id": "0126fdd2-60a3-41b6-acf6-a9b219673ca3",
+      "name": "Pipeline config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        -140
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "6e7c4197-c6dc-4d4c-b703-f106f18cd048",
+              "leftValue": "={{$('Pipeline config').first().json.use_v2}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "52580bf5-46b5-42ef-8f2f-9cf540059ee8",
+      "name": "Use v2?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2420,
+        -250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.github.com/repos/{{$env.GITHUB_OWNER}}/{{$env.GITHUB_REPO}}/actions/runs/{{$json.run_id}}/artifacts?per_page=100",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "options": {}
+      },
+      "id": "32562c96-9024-4df3-9667-b9ab29948524",
+      "name": "List run artifacts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2640,
+        -250
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__GITHUB_CRED_ID__",
+          "name": "GitHub Token (repo scope)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const run = $('Pick matching run').first().json;\nconst arts = ($input.first().json.artifacts || []).filter(a => !a.expired);\nconst byName = {};\nfor (const a of arts) byName[a.name] = a.id;\nconst chat = $('Build video_url').first().json.chat_id;\nconst out = [], missing = [];\nfor (const v of ['V1', 'V2', 'V3', 'V4', 'V5']) {\n  if (byName['version-' + v]) out.push({ json: { artifact_id: byName['version-' + v], mode: 'version', version: v, chat_id: chat } });\n  else missing.push(v);\n}\nif (byName['docs']) out.push({ json: { artifact_id: byName['docs'], mode: 'docs', version: '', chat_id: chat } });\nif (!out.length) throw new Error('no artifacts in run ' + run.html_url);\nout[0].json.missing = missing;\nout[0].json.run_url = run.html_url;\nreturn out;"
+      },
+      "id": "68cc855e-b88d-4e76-8a4d-aa1e749920a3",
+      "name": "Plan sends",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2860,
+        -250
+      ]
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "__SUB_WORKFLOW_ID__",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "id": "75e0d3df-1662-426b-834e-01a8d858c6ec",
+      "name": "Send artifact (sub-workflow)",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        -250
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "3ca5bc2e-f555-4bd0-9ecd-54addcb240ce",
+              "leftValue": "={{ ($('Plan sends').first().json.missing || []).length > 0 }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "31050461-f8f1-48ef-b4b4-49ce65f5728a",
+      "name": "Any version missing?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3080,
+        -450
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$('Build video_url').first().json.chat_id}}",
+        "text": "=Не все версии получились: нет {{$('Plan sends').first().json.missing.join(', ')}}. Лог запуска: {{$('Plan sends').first().json.run_url}}",
+        "additionalFields": {}
+      },
+      "id": "0175ca9b-a314-468d-a181-41e61e6e8eb9",
+      "name": "Notify missing versions",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3300,
+        -450
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "__TELEGRAM_CRED_ID__",
+          "name": "Video Pipeline Bot"
+        }
+      },
+      "webhookId": "__WEBHOOK_ID__"
     }
-   },
-   "id": "31050461-f8f1-48ef-b4b4-49ce65f5728a",
-   "name": "Any version missing?",
-   "type": "n8n-nodes-base.if",
-   "typeVersion": 2.2,
-   "position": [
-    3080,
-    -450
-   ]
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Owner only?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Owner only?": {
+      "main": [
+        [
+          {
+            "node": "Video and <=5min?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Video and <=5min?": {
+      "main": [
+        [
+          {
+            "node": "Telegram getFile",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram getFile": {
+      "main": [
+        [
+          {
+            "node": "Build video_url",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build video_url": {
+      "main": [
+        [
+          {
+            "node": "Pipeline switch (use_v2)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger GitHub Action": {
+      "main": [
+        [
+          {
+            "node": "Wait for run to appear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for run to appear": {
+      "main": [
+        [
+          {
+            "node": "Find run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find run": {
+      "main": [
+        [
+          {
+            "node": "Pick matching run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick matching run": {
+      "main": [
+        [
+          {
+            "node": "Run completed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run completed?": {
+      "main": [
+        [
+          {
+            "node": "Success?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check timeout",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check timeout": {
+      "main": [
+        [
+          {
+            "node": "Timed out?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Success?": {
+      "main": [
+        [
+          {
+            "node": "Use v2?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List artifacts": {
+      "main": [
+        [
+          {
+            "node": "Get artifact download URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get artifact download URL": {
+      "main": [
+        [
+          {
+            "node": "Download artifact zip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download artifact zip": {
+      "main": [
+        [
+          {
+            "node": "Unzip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unzip": {
+      "main": [
+        [
+          {
+            "node": "Pick files by name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pick files by name": {
+      "main": [
+        [
+          {
+            "node": "Send video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send video": {
+      "main": [
+        [
+          {
+            "node": "Send cover",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline switch (use_v2)": {
+      "main": [
+        [
+          {
+            "node": "Pipeline config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline config": {
+      "main": [
+        [
+          {
+            "node": "Trigger GitHub Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Timed out?": {
+      "main": [
+        [
+          {
+            "node": "Notify timeout",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 45s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 45s": {
+      "main": [
+        [
+          {
+            "node": "Find run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use v2?": {
+      "main": [
+        [
+          {
+            "node": "List run artifacts",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "List artifacts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List run artifacts": {
+      "main": [
+        [
+          {
+            "node": "Plan sends",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan sends": {
+      "main": [
+        [
+          {
+            "node": "Send artifact (sub-workflow)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Any version missing?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any version missing?": {
+      "main": [
+        [
+          {
+            "node": "Notify missing versions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  {
-   "parameters": {
-    "chatId": "={{$('Build video_url').first().json.chat_id}}",
-    "text": "=Не все версии получились: нет {{$('Plan sends').first().json.missing.join(', ')}}. Лог запуска: {{$('Plan sends').first().json.run_url}}",
-    "additionalFields": {}
-   },
-   "id": "0175ca9b-a314-468d-a181-41e61e6e8eb9",
-   "name": "Notify missing versions",
-   "type": "n8n-nodes-base.telegram",
-   "typeVersion": 1.2,
-   "position": [
-    3300,
-    -450
-   ],
-   "credentials": {
-    "telegramApi": {
-     "id": "__TELEGRAM_CRED_ID__",
-     "name": "Video Pipeline Bot"
-    }
-   },
-   "webhookId": "__WEBHOOK_ID__"
+  "settings": {
+    "executionOrder": "v1"
   }
- ],
- "connections": {
-  "Telegram Trigger": {
-   "main": [
-    [
-     {
-      "node": "Owner only?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Owner only?": {
-   "main": [
-    [
-     {
-      "node": "Video and <=5min?",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    []
-   ]
-  },
-  "Video and <=5min?": {
-   "main": [
-    [
-     {
-      "node": "Telegram getFile",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Reject",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Telegram getFile": {
-   "main": [
-    [
-     {
-      "node": "Build video_url",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Build video_url": {
-   "main": [
-    [
-     {
-      "node": "Pipeline switch (use_v2)",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Trigger GitHub Action": {
-   "main": [
-    [
-     {
-      "node": "Wait for run to appear",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Wait for run to appear": {
-   "main": [
-    [
-     {
-      "node": "Find run",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Find run": {
-   "main": [
-    [
-     {
-      "node": "Pick matching run",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Pick matching run": {
-   "main": [
-    [
-     {
-      "node": "Run completed?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Run completed?": {
-   "main": [
-    [
-     {
-      "node": "Success?",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Check timeout",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Check timeout": {
-   "main": [
-    [
-     {
-      "node": "Timed out?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Success?": {
-   "main": [
-    [
-     {
-      "node": "Use v2?",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Notify failure",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "List artifacts": {
-   "main": [
-    [
-     {
-      "node": "Get artifact download URL",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Get artifact download URL": {
-   "main": [
-    [
-     {
-      "node": "Download artifact zip",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Download artifact zip": {
-   "main": [
-    [
-     {
-      "node": "Unzip",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Unzip": {
-   "main": [
-    [
-     {
-      "node": "Pick files by name",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Pick files by name": {
-   "main": [
-    [
-     {
-      "node": "Send video",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Send video": {
-   "main": [
-    [
-     {
-      "node": "Send cover",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Pipeline switch (use_v2)": {
-   "main": [
-    [
-     {
-      "node": "Pipeline config",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Pipeline config": {
-   "main": [
-    [
-     {
-      "node": "Trigger GitHub Action",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Timed out?": {
-   "main": [
-    [
-     {
-      "node": "Notify timeout",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "Wait 45s",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Wait 45s": {
-   "main": [
-    [
-     {
-      "node": "Find run",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Use v2?": {
-   "main": [
-    [
-     {
-      "node": "List run artifacts",
-      "type": "main",
-      "index": 0
-     }
-    ],
-    [
-     {
-      "node": "List artifacts",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "List run artifacts": {
-   "main": [
-    [
-     {
-      "node": "Plan sends",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Plan sends": {
-   "main": [
-    [
-     {
-      "node": "Send artifact (sub-workflow)",
-      "type": "main",
-      "index": 0
-     },
-     {
-      "node": "Any version missing?",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  },
-  "Any version missing?": {
-   "main": [
-    [
-     {
-      "node": "Notify missing versions",
-      "type": "main",
-      "index": 0
-     }
-    ]
-   ]
-  }
- },
- "settings": {
-  "executionOrder": "v1"
- }
 }

@@ -251,6 +251,7 @@ jobs:
             out/timings_*.json
             out/qa_*.json
             out/platematch_*.json
+            out/cover_*.jpg
             out/contact_*.jpg
             out/hook_*.jpg
           retention-days: 1
@@ -295,6 +296,7 @@ jobs:
           cp parts/prep/exposure_compare.jpg result/ 2>/dev/null || true
           find parts -name 'qa_V*.json' | sed 's#.*/##' > result/_finals.txt
           find parts -name 'contact_V*.jpg' -exec cp {} result/ \;
+          find parts -name 'cover_V*.jpg' -exec cp {} result/ \;
           find parts -name 'timings_V*.json' -exec cp {} result/ \;
           cd engine && python qa.py report --dir ../parts --out ../result/QA_report.md
           cd ..
@@ -307,6 +309,7 @@ jobs:
           name: docs
           path: |
             result/contact_V*.jpg
+            result/cover_V*.jpg
             result/cuts.md
             result/exposure_compare.jpg
             result/QA_report.md
