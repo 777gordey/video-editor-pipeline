@@ -96,7 +96,15 @@ def make_chunks(words, style, sents):
                 and n["last"] - n["first"] + 1 < maxw + 1):
             c["last"] -= 1
             n["first"] -= 1
-    return chunks
+    out = []
+    for ci, c in enumerate(chunks):        # одинокий предлог/союз («С») не показываем отдельным субтитром: приклеиваем к следующему
+        nxt = chunks[ci + 1] if ci + 1 < len(chunks) else None
+        if (c["first"] == c["last"] and norm(words[c["first"]]["w"]) in weak and nxt and nxt["first"] == c["last"] + 1
+                and words[nxt["first"]]["start"] - words[c["last"]]["end"] <= 0.9 and nxt["last"] - nxt["first"] + 1 < maxw + 1):
+            nxt["first"] = c["first"]
+            continue
+        out.append(c)
+    return out
 
 
 def rule_emphasis(words, chunks):
