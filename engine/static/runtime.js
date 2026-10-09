@@ -93,8 +93,8 @@
   const HN = plan.hook.text.length;
   let hookSize = 56, bestSz = 0;
   for (let L = 1; L <= 4; L++) {                      // число строк, при котором шрифт получается КРУПНЕЕ всего (поле 920x440)
-    const perLine = Math.max(Math.ceil(HN / L) + (L > 1 ? 0.5 * hookMax : 0), hookMax);
-    const avail = 920 - (S.hook_style === "pastel" ? 110 * Math.ceil(hw.length / L) : 0);     // у пастели «таблетки» с полями
+    const perLine = Math.max(Math.ceil(HN / L) + (L > 1 ? 0.35 * hookMax : 0), hookMax);
+    const avail = 980 - (S.hook_style === "pastel" ? 110 * Math.ceil(hw.length / L) : 0);     // у пастели «таблетки» с полями
     const sz = Math.min(hookBase, avail / (perLine * CW * 1.12), 520 / (1.15 * L));
     if (sz > bestSz * 1.08) { bestSz = sz; hookSize = Math.max(56, sz); }
   }
@@ -130,6 +130,7 @@
   } else if (st === "editorial") {
     hookEl.classList.add("editorial");
     const rule = $("hookrule");
+    rule.style.top = (hookEl.offsetTop + hookEl.offsetHeight + 16) + "px";                 // линия под текстом, а не поверх него
     tl.fromTo(rule, { width: 0 }, { width: 460, duration: 0.8, ease: "power2.out", immediateRender: false }, 0.1);
     hookSpans.forEach((sp, i) => {
       const t = 0.15 + i * 0.12;
