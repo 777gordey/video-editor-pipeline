@@ -87,6 +87,15 @@ def make_chunks(words, style, sents):
             cur = []
     if cur:
         chunks.append({"first": cur[0], "last": cur[-1]})
+    weak = {"в", "на", "с", "со", "к", "у", "о", "об", "по", "за", "из", "от", "до", "для", "при", "без", "над", "под", "и", "а", "но", "что", "как", "не", "ни", "же", "бы"}
+    for ci in range(len(chunks) - 1):      # субтитр не должен кончаться предлогом/союзом: уносим его в следующий
+        c, n = chunks[ci], chunks[ci + 1]
+        w = words[c["last"]]
+        if (c["last"] > c["first"] and norm(w["w"]) in weak and not re.search(r"[,;:.!?…]$", w["w"]) and c["last"] not in sent_end
+                and n["first"] == c["last"] + 1 and words[n["first"]]["start"] - w["end"] <= 0.3
+                and n["last"] - n["first"] + 1 < maxw + 1):
+            c["last"] -= 1
+            n["first"] -= 1
     return chunks
 
 
@@ -426,7 +435,7 @@ def build_plan(version, tr, choices=None, force_rules=False, beats=None, caption
     plan["snaps"] = make_snaps(words, emph, style, plan["cams"])
     plan["graphics"] = place_graphics(gcand, words, style, dur)
     plan["sfx"] = make_sfx(plan, style, words)
-    for e in (ch.get("sfx", []) if source == "claude" else []):    # доп. точки от Claude
+    for e in ([x for x in ch.get("sfx", []) if not (style.get("premium") and x.get("kind") not in ("pop", "click"))] if source == "claude" else []):    # доп. точки от Claude (у premium только pop/click)
         try:
             k = int(e["word"])
             if 0 <= k < len(words) and e["kind"] in ("hit", "whoosh", "pop", "riser", "click"):

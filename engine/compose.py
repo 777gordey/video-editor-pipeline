@@ -92,8 +92,8 @@ def build_project(proj: Path, style: dict, plan: dict, tr: dict, layers: dict):
         # нарисованный плакатный фон V1: тёплый тёмный низ, яркое свечение, диагональная жёлтая плита за спиной, точечная сетка, блик
         scene.append(f'<div class="layer" style="background:linear-gradient(180deg,#1b1508 0%,#0d0a04 55%,#050402 100%)"></div>'
                      '<div id="bgGlow" class="layer" style="background:radial-gradient(ellipse 780px 940px at 50% 36%,rgba(255,196,0,.80) 0%,rgba(255,150,0,.30) 42%,rgba(255,120,0,0) 72%)"></div>'
-                     '<div id="bgSlab" style="position:absolute;left:-260px;top:430px;width:1600px;height:430px;background:linear-gradient(90deg,#FFC800 0%,#FFE14D 55%,#FFC800 100%);transform:rotate(-11deg);box-shadow:0 30px 90px rgba(0,0,0,.45)"></div>'
-                     '<div id="bgSlab2" style="position:absolute;left:-260px;top:900px;width:1600px;height:14px;background:#FFD400;transform:rotate(-11deg);opacity:.85"></div>'
+                     '<div id="bgSlab" style="position:absolute;left:-260px;top:500px;width:1600px;height:430px;background:linear-gradient(90deg,#FFC800 0%,#FFE14D 55%,#FFC800 100%);transform:rotate(-11deg);box-shadow:0 30px 90px rgba(0,0,0,.45)"></div>'
+                     '<div id="bgSlab2" style="position:absolute;left:-260px;top:970px;width:1600px;height:14px;background:#FFD400;transform:rotate(-11deg);opacity:.85"></div>'
                      '<div id="bgDots" class="layer" style="background-image:radial-gradient(rgba(255,212,0,.40) 3px,transparent 3.6px);background-size:60px 60px;'
                      '-webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,0) 38%,rgba(0,0,0,0) 62%,rgba(0,0,0,.7) 100%);mask-image:linear-gradient(180deg,rgba(0,0,0,.95) 0%,rgba(0,0,0,0) 38%,rgba(0,0,0,0) 62%,rgba(0,0,0,.7) 100%)"></div>'
                      '<div id="bgStripe" class="layer" style="background:linear-gradient(115deg,rgba(255,255,255,0) 40%,rgba(255,255,255,.10) 50%,rgba(255,255,255,0) 60%);width:1500px;left:-210px"></div>'
