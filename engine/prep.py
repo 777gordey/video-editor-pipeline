@@ -19,6 +19,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import exposure
 from common import SPEED, FPS, W, H, AR, log, run, probe, duration, save_json
 
 PAUSE_MAX = 0.4         # пауза длиннее — вырезаем
@@ -201,7 +202,7 @@ def build_segments(words, drop, total):
     return out, pauses
 
 
-def render_cut_speed(src: Path, segs, dst: Path):
+def render_cut_speed(src: Path, segs, dst: Path, exp_filter: str = ""):
     lines = []
     for k, (s, e, _) in enumerate(segs):
         d = e - s
@@ -211,7 +212,7 @@ def render_cut_speed(src: Path, segs, dst: Path):
                      f"afade=t=in:d={fade:.4f},afade=t=out:st={d - fade:.4f}:d={fade:.4f}[a{k}]")
     cat = "".join(f"[v{k}][a{k}]" for k in range(len(segs)))
     lines.append(f"{cat}concat=n={len(segs)}:v=1:a=1[cv][ca]")
-    lines.append(f"[cv]setpts=PTS/{SPEED},fps={FPS}[vo]")
+    lines.append(f"[cv]setpts=PTS/{SPEED},fps={FPS}" + (f",{exp_filter}" if exp_filter else "") + "[vo]")
     lines.append(f"[ca]atempo={SPEED},aresample={AR}[ao]")      # atempo сохраняет тон
     script = dst.with_suffix(".filter.txt")
     script.write_text(";\n".join(lines), encoding="utf-8")
@@ -343,7 +344,22 @@ def main():
     log(f"[prep] drop={len(drop)} segments={len(segs)} pauses={len(pauses)}")
 
     prepped = out / "prepped.mp4"
-    render_cut_speed(norm_mp4, segs, prepped)
+    try:
+        em = exposure.measure(norm_mp4)
+        exp_filter, einfo = exposure.plan_correction(em)
+    except Exception as e:  # noqa
+        print(f"EXPOSURE SKIPPED: {type(e).__name__}: {str(e)[:200]}", flush=True)
+        em, exp_filter, einfo = {}, "", {"applied": [], "error": str(e)[:200]}
+    log(f"[prep] exposure before={em} filter={exp_filter or 'none'}")
+    render_cut_speed(norm_mp4, segs, prepped, exp_filter)
+    try:
+        ea = exposure.measure(prepped)
+        save_json(out / "exposure.json", {"before": em, "after": ea, "filter": exp_filter, **einfo})
+        exposure.compare_image(norm_mp4, prepped, out / "exposure_compare.jpg")
+        if einfo.get("dark_clip"):
+            print("DARK CLIP: noisy result, consider re-shooting with more light", flush=True)
+    except Exception as e:  # noqa
+        print(f"EXPOSURE REPORT SKIPPED: {type(e).__name__}: {str(e)[:200]}", flush=True)
     fw, fdur = final_timeline(words, segs)
     real = duration(prepped)
     log(f"[prep] final duration planned={fdur:.2f}s actual={real:.2f}s speed={SPEED}")

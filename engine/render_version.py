@@ -15,6 +15,7 @@ from pathlib import Path
 
 import audio
 import compose
+import exposure
 import matte as matte_mod
 import plan as plan_mod
 import plates
@@ -97,8 +98,21 @@ def main():
         proj_media.mkdir(parents=True, exist_ok=True)
         person = proj_media / "person.mp4"
 
-        def grade():
-            run(["ffmpeg", "-y", "-loglevel", "error", "-i", prepped, "-an", "-vf", style["grade"],
+        def grade(plate_future=None):
+            vf = style["grade"]
+            if plate_future is not None:       # свет на лице подгоняем под плейт
+                try:
+                    pp = plate_future.result()
+                    ej = prep / "exposure.json"
+                    if pp and ej.exists():
+                        extra, einfo = exposure.match_plate(load_json(ej).get("after"), exposure.measure(pp))
+                        if extra:
+                            vf = vf + "," + extra
+                        log(f"[plate-match] {einfo} -> {extra or 'no change'}")
+                        save_json(out / f"platematch_{v}.json", {"filter": extra, **einfo})
+                except Exception as e:  # noqa
+                    log(f"[plate-match] skipped: {e}")
+            run(["ffmpeg", "-y", "-loglevel", "error", "-i", prepped, "-an", "-vf", vf,
                  "-c:v", "libx264", "-preset", "fast", "-crf", 13, "-r", FPS, "-pix_fmt", "yuv420p", person])
 
         def plate():
@@ -120,7 +134,9 @@ def main():
 
         layers["person"] = "person.mp4"
         with ThreadPoolExecutor(3) as ex:          # плейт, грейд и вырезка фона идут одновременно
-            f_g, f_p, f_m = ex.submit(grade), ex.submit(plate), ex.submit(do_matte)
+            f_p = ex.submit(plate)
+            f_g = ex.submit(grade, f_p if style["bg"] == "plate" else None)
+            f_m = ex.submit(do_matte)
             f_g.result()
             plate_path = f_p.result()
             if plate_path:

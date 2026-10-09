@@ -191,6 +191,26 @@ def cmd_report(a):
              "Automatic checks on every finished version (numbers measured with ffprobe/ffmpeg; "
              "text-in-frame and cut-out edges are checked visually on the contact sheets).", ""]
     allok = True
+    ex = next(iter(d.rglob("exposure.json")), None)
+    if ex:
+        e = load_json(ex)
+        b, a_ = e.get("before", {}), e.get("after", {})
+        lines += ["## Exposure / colour normalisation (per clip)", "",
+                  f"- Measured before: median luma {b.get('median_luma')}, centre {b.get('centre_median_luma')}, "
+                  f"p2/p98 {b.get('p02')}/{b.get('p98')}, clipped black/white {b.get('clip_black_pct')}%/{b.get('clip_white_pct')}%, "
+                  f"R/B {b.get('rb_ratio')}, noise sigma {b.get('noise_sigma')}",
+                  f"- Applied: {'; '.join(e.get('applied', [])) or 'nothing (clip is normal, left untouched)'}",
+                  f"- Filter: `{e.get('filter') or 'none'}`",
+                  f"- Median luma before -> after: {b.get('median_luma')} -> {a_.get('median_luma')}"
+                  f" (noise sigma {b.get('noise_sigma')} -> {a_.get('noise_sigma')})"]
+        if e.get("dark_clip"):
+            lines.append("- **DARK CLIP: noisy result, consider re-shooting with more light**")
+        lines += ["- Before/after stills: exposure_compare.jpg (top row before, bottom row after)", ""]
+    for p in sorted(d.rglob("platematch_V*.json")):
+        pm = load_json(p)
+        lines.append(f"- Plate light match {p.stem.split('_')[1]}: {pm.get('filter') or 'no change'}")
+    if list(d.rglob("platematch_V*.json")):
+        lines.append("")
     for v in sorted(NAMES):
         f = next(iter(d.rglob(f"qa_{v}.json")), None)
         if not f:
@@ -201,6 +221,11 @@ def cmd_report(a):
         lines += [f"## {v} {NAMES[v]} — {'PASS' if q['ok'] else 'FAIL'}", ""]
         for c in q["checks"]:
             lines.append(f"- {'PASS' if c['pass'] else 'FAIL'}: {c['name']} — {c['detail']}")
+        pj = next(iter(d.rglob(f"plan_{v}.json")), None)
+        if pj:
+            pl_ = load_json(pj)
+            lines.append(f"- Hook ({pl_.get('source')}): «{pl_.get('hook', {}).get('text', '')}»"
+                         + (f"  — PLAN FALLBACK: {pl_['fallback_reason']}" if pl_.get("fallback_reason") else ""))
         lines.append("")
     extra = Path(a.notes).read_text(encoding="utf-8") if a.notes and Path(a.notes).exists() else ""
     lines += [f"Overall: {'ALL CHECKS PASSED' if allok else 'SOME CHECKS FAILED'}", ""]

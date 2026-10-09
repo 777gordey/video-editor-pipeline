@@ -17,6 +17,10 @@ on:
         description: "faster-whisper model (large-v3 = final, small = draft)"
         required: false
         default: "large-v3"
+      darken:
+        description: "Test only: darken the source by N stops (1.5 = underexposed test)"
+        required: false
+        default: "0"
       loop:
         description: "Test only: repeat the source N times (2 = long-clip stress test)"
         required: false
@@ -89,6 +93,12 @@ jobs:
           if [ -n "$L" ] && [ "$L" -gt 1 ] 2>/dev/null; then
             ffmpeg -y -loglevel error -stream_loop $((L-1)) -i source.mp4 -c copy source_long.mp4 && mv source_long.mp4 source.mp4
           fi
+          D="${{ github.event.inputs.darken }}"
+          if [ -n "$D" ] && [ "$D" != "0" ]; then
+            F=$(python3 -c "print(round(2**(-float('$D')/2.2),3))")
+            ffmpeg -y -loglevel error -i source.mp4 -vf "lutrgb=r=val*$F:g=val*$F:b=val*$F,noise=alls=3:allf=t" -c:v libx264 -crf 14 -c:a copy dark.mp4 && mv dark.mp4 source.mp4
+            echo "darkened by $D stops (gain $F)"
+          fi
           ls -la source.mp4
 
       - uses: actions/setup-node@v4
@@ -118,6 +128,8 @@ jobs:
             out/transcript.json
             out/plans.json
             out/cuts.md
+            out/exposure.json
+            out/exposure_compare.jpg
           retention-days: 1
           if-no-files-found: error
 
@@ -225,6 +237,7 @@ jobs:
             out/plan_*.json
             out/timings_*.json
             out/qa_*.json
+            out/platematch_*.json
             out/contact_*.jpg
             out/hook_*.jpg
           retention-days: 1
@@ -266,6 +279,7 @@ jobs:
         run: |
           mkdir -p result
           cp parts/prep/cuts.md result/cuts.md
+          cp parts/prep/exposure_compare.jpg result/ 2>/dev/null || true
           find parts -name 'qa_V*.json' | sed 's#.*/##' > result/_finals.txt
           find parts -name 'contact_V*.jpg' -exec cp {} result/ \;
           find parts -name 'timings_V*.json' -exec cp {} result/ \;
@@ -281,6 +295,7 @@ jobs:
           path: |
             result/contact_V*.jpg
             result/cuts.md
+            result/exposure_compare.jpg
             result/QA_report.md
           retention-days: 1
           if-no-files-found: error
