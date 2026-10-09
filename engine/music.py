@@ -140,7 +140,7 @@ def compose_track(dur, preset=0):
             for q in (1, 3):
                 _add(drum_l, t0 + q * beat, _snare(rng), 0.30 if p["drums"] == 2 else 0.18)
             for s in range(8):
-                _add(drum_l, t0 + s * beat / 2, _hat(rng, open_=(s == 7)), 0.11 if s % 2 else 0.08)
+                _add(drum_l, t0 + s * beat / 2, _hat(rng, open_=(s == 7)), 0.06 if s % 2 else 0.04)
     wet = _reverb(pad_l * 0.7 + keys_l)
     mix = pad_l * 0.95 + keys_l * 0.9 + wet * 0.55 + bass_l * 0.8 + drum_l
     mix = _hp(mix, 35, 2)
