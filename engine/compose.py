@@ -38,7 +38,7 @@ STYLE_CSS = {
     "V1": """
 .chunk{font-weight:900;-webkit-text-stroke:12px #000;paint-order:stroke fill;text-shadow:0 10px 0 rgba(0,0,0,.55)}
 .w.emph{font-size:1.28em}
-#hook.slam{flex-direction:column;align-items:center;top:210px}
+#hook.slam{top:170px}
 #hook.slam .hw{font-size:1em;line-height:1.02;color:#fff;-webkit-text-stroke:14px #000;paint-order:stroke fill;text-shadow:0 12px 0 rgba(0,0,0,.6)}
 """,
     "V2": """
@@ -46,16 +46,15 @@ STYLE_CSS = {
 #hook.glitch .hw{font-size:1em;color:#fff;text-shadow:5px 0 #ff2bd6,-5px 0 #00f5ff,0 0 38px #ff2bd6}
 """,
     "V3": """
-.chunk{font-weight:700;text-shadow:0 3px 18px rgba(0,0,0,.65),0 1px 0 rgba(0,0,0,.4);letter-spacing:.005em}
-#hook.editorial .hw{font-size:1em;font-weight:700;color:#F6EEDF;text-shadow:0 4px 30px rgba(0,0,0,.6)}
-#hook.editorial{flex-direction:column;align-items:center;top:300px}
-#hookrule{position:absolute;left:310px;top:640px;height:5px;width:0;background:var(--accent)}
+.chunk{font-weight:700;text-shadow:0 0 5px rgba(0,0,0,.85),0 3px 18px rgba(0,0,0,.75),0 1px 0 rgba(0,0,0,.5);letter-spacing:.005em}
+#hook.editorial .hw{font-size:1em;font-weight:700;color:#FFF8EA;text-shadow:0 0 6px rgba(0,0,0,.85),0 3px 24px rgba(0,0,0,.8)}
+#hook.editorial{top:190px}
+#hookrule{position:absolute;left:310px;top:560px;height:5px;width:0;background:var(--accent)}
 """,
     "V4": """
 .chunk{text-shadow:0 0 22px rgba(77,163,255,.7),0 6px 0 rgba(0,0,0,.6);-webkit-text-stroke:5px #05070D;paint-order:stroke fill;letter-spacing:.02em}
-#hook.chrome3d{top:230px;filter:drop-shadow(0 0 22px rgba(77,163,255,.65)) brightness(1.25)}
-#hook.chrome3d .hw{position:relative;font-size:1em;color:#7f93b8;line-height:1.05;margin:0 14px}
-#hook.chrome3d .hw::after{content:attr(data-t);position:absolute;left:0;top:0;background:linear-gradient(180deg,#ffffff 0%,#e6eefb 36%,#9db4d6 50%,#ffffff 64%,#b9c9e4 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+#hook.chrome3d{top:200px;filter:drop-shadow(0 0 20px rgba(77,163,255,.8))}
+#hook.chrome3d .hw{position:relative;font-size:1em;color:#F4F8FF;line-height:1.08;margin:0 14px;-webkit-text-stroke:2px #0a1226;paint-order:stroke fill}
 """,
     "V5": """
 .chunk{width:max-content;max-width:940px;left:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,.9);border-radius:64px;padding:22px 46px;box-shadow:0 14px 44px rgba(255,111,145,.35);font-weight:900;-webkit-text-stroke:0}
@@ -125,7 +124,7 @@ video.layer{{object-fit:cover}}
 .g.circ .num{{width:210px;height:210px;border-radius:50%;border:12px solid var(--emph);background:rgba(8,10,20,.78);color:#fff;
   font-size:130px;font-weight:900;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px rgba(0,0,0,.5)}}
 .g.circ .lbl{{margin-top:14px;font-size:44px;font-weight:900;color:#fff;text-shadow:0 4px 14px rgba(0,0,0,.8);text-align:center;width:420px}}
-.g.globe{{width:500px;height:500px}}
+.g.globe{{width:400px;height:400px}}
 #flash{{position:absolute;left:0;top:0;width:{W}px;height:{H}px;background:#fff;opacity:0}}
 #vignette{{position:absolute;left:0;top:0;width:{W}px;height:{H}px;background:radial-gradient(ellipse at 50% 45%,rgba(0,0,0,0) 52%,rgba(0,0,0,.5) 100%)}}
 {STYLE_CSS[style['id']]}

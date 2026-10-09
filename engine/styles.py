@@ -27,6 +27,7 @@ STYLES = {
         id="V3", name="Editorial",
         angle="РЕЗУЛЬТАТ СРАЗУ (result first): итог/выгода в первой фразе, спокойно, одной зрелой фразой.",
         bg="plate", matte=True, plate_query="pine forest sunlight trees portrait", ambience="birds", music_idx=2,
+        plate_grade="eq=brightness=-0.12:contrast=0.95:saturation=0.8",
         font="Playfair Display", font_weight=700, caps=False, cap_size=84, cap_words=4,
         colors=dict(text="#F6EEDF", emph="#E8B86A", stroke="#1B140C", accent="#E8B86A"),
         hook_style="editorial", cam_gap=4.2, snap_on_emph=False, graphics_density=0.45,

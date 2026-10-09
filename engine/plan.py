@@ -145,7 +145,7 @@ def place_graphics(cands, words, style, dur):
     out, last = [], -99
     for g in sorted(cands, key=lambda g: g["word"]):
         t = words[g["word"]]["start"]
-        if t < 1.0 or t > dur - 1.0 or t - last < gap:
+        if t < 2.3 or t > dur - 1.0 or t - last < gap:
             continue
         d = {"globe": 2.0, "circle": 1.7, "icon": 1.4}[g["kind"]]
         item = {"t": round(t, 3), "kind": g["kind"], "word": g["word"], "dur": d}

@@ -50,14 +50,19 @@
 
   /* ---------- субтитры: слово за словом, акцентные слова крупнее и цветом ---------- */
   const capLayer = $("captions");
+  const HOOK_T1 = plan.hook.t1;                       // пока висит хук, субтитры не показываем (не перекрываем слова)
+  const ACT = S.id === "V2" ? C.text : C.accent;      // цвет «говорящего» слова: розовый на коже нечитаем
+  const EM = S.id === "V1" ? 1.28 * 1.22 : 1.22;      // реальный визуальный рост акцентного слова
   plan.chunks.forEach((c, ci) => {
     const t0 = words[c.first].start;
     const nextStart = ci + 1 < plan.chunks.length ? words[plan.chunks[ci + 1].first].start : DUR;
     const t1 = Math.min(nextStart, words[c.last].end + 0.45);
+    if (t1 <= HOOK_T1) return;
     const box = mk("div", "chunk", capLayer);
     const toks = words.slice(c.first, c.last + 1).map((w) => tidy(w.w));
-    const lng = Math.max(...toks.map((x) => x.length));
-    const tot = toks.join(" ").length;
+    const eff = toks.map((x, k) => x.length * (emphSet.has(c.first + k) ? EM : 1));
+    const lng = Math.max(...eff);
+    const tot = eff.reduce((a, b) => a + b, 0) + 0.35 * (toks.length - 1);
     box.style.fontSize = Math.min(fitSize(S.cap_size, lng, 860, 1.3), fitSize(S.cap_size, tot / 2, 860, 1.15)) + "px";
     const spans = [];
     const capFs = parseFloat(box.style.fontSize);
@@ -67,13 +72,15 @@
       if (emph) sp.style.margin = "0 " + Math.round(0.11 * tidy(words[i].w).length * CW * capFs + 0.14 * capFs) + "px";   // scale 1.22 не должен наезжать на соседей
       spans.push([sp, words[i].start, emph]);
     }
-    tl.set(box, { opacity: 1 }, t0);
+    const tShow = Math.max(t0, HOOK_T1);
+    tl.set(box, { opacity: 1 }, tShow);
     if (S.id === "V5") spans.forEach(([sp]) => tl.set(sp, { opacity: 1 }, t0));   // пилюля не должна быть пустой
     spans.forEach(([sp, ws, emph]) => {
-      tl.set(sp, { opacity: 1, color: emph ? C.emph : C.accent }, ws);
+      tl.set(sp, { opacity: 1, color: emph ? C.emph : ACT }, ws);
       tl.fromTo(sp, { scale: emph ? 0.6 : 0.8 }, { scale: emph ? 1.22 : 1, duration: 0.14, ease: "back.out(2.4)", immediateRender: false }, ws);
       if (!emph) tl.set(sp, { color: C.text }, ws + 0.22);
     });
+    spans.forEach(([sp, ws]) => { if (ws < tShow) tl.set(sp, { opacity: 1, color: C.text }, tShow); });
     tl.set(box, { opacity: 0 }, t1);
   });
 
@@ -83,9 +90,14 @@
   const T1 = plan.hook.t1;
   const hookBase = S.hook_style === "slam" ? 150 : S.hook_style === "chrome3d" ? 140 : 110;
   const hookMax = Math.max(...hw.map((x) => x.length));
-  let hookSize = fitSize(hookBase, hookMax, 880, 1);
-  if (S.hook_style === "slam") hookSize = Math.min(hookSize, 760 / (hw.length * 1.1));
-  else hookSize = Math.min(hookSize, fitSize(hookBase, hw.join(" ").length / 3, 880, 1));
+  const HN = plan.hook.text.length;
+  let hookSize = 56;
+  for (let L = 1; L <= 3; L++) {                      // самое малое число строк, при котором текст влезает в 880x380
+    const perLine = Math.max(Math.ceil(HN / L) + (L > 1 ? 0.5 * hookMax : 0), hookMax);
+    const sz = Math.min(hookBase, 880 / (perLine * CW * 1.12));
+    if (sz * 1.15 * L <= 380 || L === 3) { hookSize = Math.max(56, Math.min(sz, 380 / (1.15 * L))); break; }
+  }
+  const hookBest = hw.reduce((bi, x, i) => (x.length > hw[bi].length ? i : bi), 0);   // подсвечиваем самое «мясное» слово
   hookEl.style.fontSize = hookSize + "px";
   const hookSpans = hw.map((w) => mk("span", "hw", hookEl, esc(S.caps ? w.toUpperCase() : w)));
   hookSpans.forEach((sp, i) => tl.set(sp, { opacity: 0 }, 0));
@@ -94,7 +106,7 @@
     hookEl.classList.add("slam");
     hookSpans.forEach((sp, i) => {
       const t = 0.05 + i * 0.13;
-      if (i % 2 === 1) sp.style.color = C.accent;
+      if (i === hookBest) sp.style.color = C.accent;
       tl.set(sp, { opacity: 1, scale: 2.6 }, t);
       tl.to(sp, { scale: 1, duration: 0.14, ease: "power4.in" }, t);
       tl.to(hookEl, { x: 0, duration: 0.01 }, t + 0.14);
@@ -145,6 +157,7 @@
   tl.set(hookEl, { opacity: 1 }, 0.001);
   tl.to(hookEl, { opacity: 0, scale: 0.94, duration: 0.2, ease: "power1.in" }, T1 - 0.2);
   tl.set(hookEl, { visibility: "hidden" }, T1);
+  tl.to($("hookrule"), { opacity: 0, duration: 0.2 }, T1 - 0.2);
 
   /* ---------- глобус (canvas, ортографическая проекция, всё из t) ---------- */
   function makeGlobe(canvas, size) {
@@ -246,15 +259,15 @@
     let box;
     if (g.kind === "icon") {
       box = mk("div", "g icon", fx, `<svg viewBox="0 0 100 100" width="150" height="150">${ICON[g.icon] || ICON.star}</svg>`);
-      box.style.left = (right ? 700 : 140) + "px"; box.style.top = "470px";
+      box.style.left = (right ? 760 : 90) + "px"; box.style.top = "110px";
     } else if (g.kind === "circle") {
       box = mk("div", "g circ", fx, `<div class="num">${g.num}</div>${g.text ? `<div class="lbl">${esc(g.text)}</div>` : ""}`);
-      box.style.left = (right ? 640 : 110) + "px"; box.style.top = "430px";
+      box.style.left = (right ? 700 : 90) + "px"; box.style.top = "90px";
     } else {
       const cv = mk("canvas", "g globe", fx);
       box = cv;
-      cv.style.left = "290px"; cv.style.top = "300px";
-      const draw = makeGlobe(cv, 500);
+      cv.style.left = "340px"; cv.style.top = "40px";
+      const draw = makeGlobe(cv, 400);
       const o = { r: 0 };
       draw(0);
       tl.to(o, { r: Math.PI * 1.2, duration: g.dur, ease: "none", onUpdate: () => draw(o.r) }, t0);
