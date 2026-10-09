@@ -14,7 +14,7 @@ RANGE = {
     "latin": "U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD",
 }
 FALLBACK_BG = {
-    "V1": "#111",
+    "V1": "#0c0b07",
     "V2": "radial-gradient(ellipse at 30% 20%,#5b1a8a 0%,#1a0a3a 55%,#07030f 100%)",
     "V3": "linear-gradient(180deg,#27402a 0%,#122216 60%,#0a140c 100%)",
     "V4": "radial-gradient(ellipse at 50% 32%,#22335a 0%,#0b1226 52%,#02040a 100%)",
@@ -36,10 +36,17 @@ def font_faces():
 
 STYLE_CSS = {
     "V1": """
-.chunk{font-weight:900;-webkit-text-stroke:12px #000;paint-order:stroke fill;text-shadow:0 10px 0 rgba(0,0,0,.55)}
-.w.emph{font-size:1.28em}
-#hook.slam{top:170px}
-#hook.slam .hw{font-size:1em;line-height:1.02;color:#fff;-webkit-text-stroke:14px #000;paint-order:stroke fill;text-shadow:0 12px 0 rgba(0,0,0,.6)}
+.chunk{font-weight:900;letter-spacing:-.005em;text-shadow:0 3px 0 rgba(0,0,0,.35),0 8px 30px rgba(0,0,0,.55)}
+.chunk .w{padding:.02em .12em;border-radius:.2em}
+.chunk .w.emph{color:#0c0b07 !important;background:#FFD400;font-size:1.12em;text-shadow:none;box-shadow:0 8px 24px rgba(255,212,0,.28)}
+#hook.slam{top:200px}
+#hook.slam .hw{font-size:1em;line-height:1.04;color:#fff;font-weight:900;text-shadow:0 4px 0 rgba(0,0,0,.35),0 10px 40px rgba(0,0,0,.6)}
+.g.icon{width:150px;height:150px;border-radius:40px;background:#FFD400;box-shadow:0 14px 36px rgba(0,0,0,.5)}
+.g.icon svg{stroke:#0c0b07;stroke-width:7;width:92px;height:92px}
+.g.circ .num{width:150px;height:150px;font-size:92px;border:0;background:#FFD400;color:#0c0b07;border-radius:40px}
+.g.circ .lbl{font-size:40px;font-weight:900;color:#fff}
+#bgWord .bw{position:absolute;left:0;width:1080px;text-align:center;font-family:'Montserrat';font-weight:900;text-transform:uppercase;
+  color:rgba(255,212,0,.07);-webkit-text-stroke:3px rgba(255,212,0,.5);opacity:0;white-space:nowrap;line-height:1}
 """,
     "V2": """
 .chunk{font-weight:900;text-shadow:0 0 14px var(--accent),0 0 34px var(--accent),0 6px 0 rgba(0,0,0,.5);-webkit-text-stroke:3px #1a0033;paint-order:stroke fill}
@@ -81,6 +88,14 @@ def build_project(proj: Path, style: dict, plan: dict, tr: dict, layers: dict):
     bgcss = FALLBACK_BG[style["id"]]
     if layers.get("plate"):
         scene.append(vid("plate", layers["plate"]))
+    elif style["bg"] == "designed":
+        # нарисованный фон V1: тёмный тёплый базовый цвет, жёлтое свечение за головой, точки, слова-подсказки за спиной
+        scene.append(f'<div class="layer" style="background:{bgcss}"></div>'
+                     '<div id="bgGlow" class="layer" style="background:radial-gradient(ellipse 620px 760px at 50% 40%,rgba(255,196,0,.55) 0%,rgba(255,160,0,.18) 45%,rgba(255,140,0,0) 72%)"></div>'
+                     '<div id="bgDots" class="layer" style="background-image:radial-gradient(rgba(255,212,0,.22) 2.2px,transparent 2.8px);background-size:54px 54px;'
+                     '-webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,.15) 55%,rgba(0,0,0,.6) 100%);mask-image:linear-gradient(180deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,.15) 55%,rgba(0,0,0,.6) 100%)"></div>'
+                     '<div id="bgStripe" class="layer" style="background:linear-gradient(115deg,rgba(255,212,0,0) 38%,rgba(255,212,0,.10) 50%,rgba(255,212,0,0) 62%);width:1500px;left:-210px"></div>'
+                     '<div id="bgWord" class="layer"></div>')
     elif style["bg"] != "room":
         scene.append(f'<div class="layer" style="background:{bgcss}"></div>')
     if style.get("globe_behind") and layers.get("inv"):

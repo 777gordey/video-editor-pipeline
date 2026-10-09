@@ -14,7 +14,7 @@
   };
   const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
   const tidy = (w) => w.replace(/^[«"(]+|[»",;:.)]+$/g, "");   // знаки в конце слов на экране не нужны
-  const ZM = { V1: 1.15, V2: 1.1, V3: 0.7, V4: 1.0, V5: 0.55 }[S.id];
+  const ZM = { V1: 0.85, V2: 1.1, V3: 0.7, V4: 1.0, V5: 0.55 }[S.id];
   const F = { wide: 1.0, medium: 1.14, close: 1.34 };
   const emphSet = new Set(plan.emphasis);
   /* ширина символа (в em) по шрифту: подгоняем размер БЕЗ измерения DOM (шрифты могут не успеть загрузиться) */
@@ -34,7 +34,7 @@
       tl.set(snap, { x: 300, filter: "blur(18px)" }, t0);
       tl.to(snap, { x: 0, filter: "blur(0px)", duration: 0.22, ease: "power3.out" }, t0);
       flash(t0, 0.5);
-    } else if (i > 0 && (S.id === "V1" || S.id === "V2")) {
+    } else if (i > 0 && (S.id === "V2")) {
       flash(t0, 0.18);
     }
   });
@@ -52,7 +52,7 @@
   const capLayer = $("captions");
   const HOOK_T1 = plan.hook.t1;                       // пока висит хук, субтитры не показываем (не перекрываем слова)
   const ACT = S.id === "V2" ? C.text : C.accent;      // цвет «говорящего» слова: розовый на коже нечитаем
-  const EM = S.id === "V1" ? 1.28 * 1.22 : 1.22;      // реальный визуальный рост акцентного слова
+  const EM = S.id === "V1" ? 1.12 * 1.14 : 1.22;      // реальный визуальный рост акцентного слова
   plan.chunks.forEach((c, ci) => {
     const t0 = words[c.first].start;
     const nextStart = ci + 1 < plan.chunks.length ? words[plan.chunks[ci + 1].first].start : DUR;
@@ -76,8 +76,8 @@
     tl.set(box, { opacity: 1 }, tShow);
     if (S.id === "V5") spans.forEach(([sp]) => tl.set(sp, { opacity: 1 }, t0));   // пилюля не должна быть пустой
     spans.forEach(([sp, ws, emph]) => {
-      tl.set(sp, { opacity: 1, color: emph ? C.emph : ACT }, ws);
-      tl.fromTo(sp, { scale: emph ? 0.6 : 0.8 }, { scale: emph ? 1.22 : 1, duration: 0.14, ease: "back.out(2.4)", immediateRender: false }, ws);
+      tl.set(sp, { opacity: 1, color: emph ? (S.id === "V1" ? "#0c0b07" : C.emph) : (S.id === "V1" ? C.text : ACT) }, ws);
+      tl.fromTo(sp, { scale: emph ? 0.7 : 0.85 }, { scale: emph ? (S.id === "V1" ? 1.14 : 1.22) : 1, duration: S.id === "V1" ? 0.18 : 0.14, ease: "back.out(S_BACK)".replace("S_BACK", S.id === "V1" ? "1.7" : "2.4"), immediateRender: false }, ws);
       if (!emph) tl.set(sp, { color: C.text }, ws + 0.22);
     });
     spans.forEach(([sp, ws]) => { if (ws < tShow) tl.set(sp, { opacity: 1, color: C.text }, tShow); });
@@ -160,6 +160,31 @@
   tl.to(hookEl, { opacity: 0, scale: 0.94, duration: 0.2, ease: "power1.in" }, T1 - 0.2);
   tl.set(hookEl, { visibility: "hidden" }, T1);
   tl.to($("hookrule"), { opacity: 0, duration: 0.2 }, T1 - 0.2);
+
+
+  /* ---------- V1: нарисованный фон живёт (свечение дышит, диагональный блик, точки плывут), слова-подсказки за спиной ---------- */
+  if (S.id === "V1") {
+    const glow = $("bgGlow"), dots = $("bgDots"), stripe = $("bgStripe"), bw = $("bgWord");
+    tl.fromTo(glow, { scale: 0.92 }, { scale: 1.12, duration: DUR, ease: "sine.inOut" }, 0);
+    tl.fromTo(dots, { y: 0 }, { y: 54, duration: Math.max(DUR, 1), ease: "none" }, 0);
+    for (let k = 0; k * 7.5 < DUR; k++) {          // блик проходит слева направо раз в ~7.5 с
+      tl.fromTo(stripe, { x: -700 }, { x: 700, duration: 2.2, ease: "power1.inOut", immediateRender: false }, 1.2 + k * 7.5);
+    }
+    const picks = [];
+    plan.emphasis.forEach((i) => {                    // до 4 коротких смысловых слов, не чаще раза в 6.5 с, не во время хука
+      const w = tidy(words[i].w);
+      if (w.length < 4 || w.length > 10 || words[i].start < HOOK_T1 + 0.8 || words[i].start > DUR - 1.5) return;
+      if (picks.length && words[i].start - picks[picks.length - 1].t < 6.5) return;
+      if (picks.length < 4) picks.push({ w, t: words[i].start });
+    });
+    picks.forEach((p, k) => {
+      const el = mk("div", "bw", bw, esc(p.w.toUpperCase()));
+      el.style.fontSize = Math.min(300, 1000 / (p.w.length * 0.84)) + "px";
+      el.style.top = (330 + (k % 2) * 90) + "px";
+      tl.fromTo(el, { opacity: 0, scale: 1.18, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power3.out", immediateRender: false }, p.t - 0.05);
+      tl.to(el, { opacity: 0, scale: 0.96, duration: 0.5, ease: "power2.in" }, p.t + 2.0);
+    });
+  }
 
   /* ---------- глобус (canvas, ортографическая проекция, всё из t) ---------- */
   function makeGlobe(canvas, size) {

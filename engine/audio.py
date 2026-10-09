@@ -159,8 +159,11 @@ def prepare_music(style, dur, path):
     """-> (источник, список битов в секундах)"""
     d, files = find_music()
     if not files:
-        log("[audio] MUSIC: brand/music и assets/music пусты — синтетический бит")
-        return "synth", synth_music(dur, path)
+        log("[audio] MUSIC: brand/music пуст — музыка, написанная кодом (аккорды/бас/клавиши/ударные), пресет", style["music_idx"])
+        import music as music_mod
+        x, kicks = music_mod.compose_track(dur, style["music_idx"])
+        _write_wav(path, x)
+        return "composed", kicks
     src = files[style["music_idx"] % len(files)]
     fade = max(dur - 1.5, 0)
     run(["ffmpeg", "-y", "-loglevel", "error", "-stream_loop", "-1", "-i", src, "-t", f"{dur:.3f}",
@@ -170,8 +173,23 @@ def prepare_music(style, dur, path):
 
 def mix(voice_media, music, amb, sfx, style, out_wav):
     """voice_media: prepped.mp4. Двухпроходный loudnorm до LUFS."""
+    voice_f = ("highpass=f=85,afftdn=nr=12:nf=-38:tn=1,equalizer=f=220:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1.1:g=2.5,"
+               "equalizer=f=8500:t=h:w=1:g=1.2,deesser=i=0.4:m=0.5:f=0.5,acompressor=threshold=-22dB:ratio=2.8:attack=6:release=150:makeup=2.5,"
+               "alimiter=limit=0.93:attack=2:release=40")
+    def _lufs(args, fl):
+        r = subprocess.run(["ffmpeg", "-hide_banner", "-nostats", *args, "-af", fl + ",loudnorm=I=-23:print_format=json", "-f", "null", "-"],
+                           capture_output=True, text=True)
+        mm = re.search(r"\{[^{}]*\"input_i\"[^{}]*\}", r.stderr, re.S)
+        return float(json.loads(mm.group(0))["input_i"]) if mm else None
     g = style["music_gain_db"]
-    chain = (f"[0:a]asplit=2[v1][v2];[1:a]volume={g}dB[m0];"
+    rel = style.get("music_rel_db")
+    if rel is not None:                       # музыка = голос + rel LU (до дакинга), а не «на глаз»
+        lv, lm = _lufs(["-i", str(voice_media), "-vn"], voice_f), _lufs(["-i", str(music)], "anull")
+        if lv is not None and lm is not None:
+            g = round(lv + rel - lm, 1)
+            style["music_gain_db"] = g
+            log(f"[audio] voice {lv:.1f} LUFS, music {lm:.1f} LUFS -> music gain {g} dB (voice {rel:+} LU, then ducked)")
+    chain = (f"[0:a]{voice_f},asplit=2[v1][v2];[1:a]volume={g}dB[m0];"
              f"[m0][v2]sidechaincompress=threshold=0.03:ratio=9:attack=12:release=450[md];"
              f"[2:a]volume=-27dB[amb];"
              f"[v1][md][amb][3:a]amix=inputs=4:duration=first:normalize=0")
