@@ -5,7 +5,7 @@ STYLES = {
         id="V1", name="Bold Yellow",
         angle="ПРОТИВОРЕЧИВОЕ утверждение (contrarian claim): идёт против привычного мнения, коротко, как удар.",
         bg="designed", matte=True, plate_query=None, ambience=None, music_idx=0,
-        font="Montserrat", font_weight=900, caps=True, cap_size=104, cap_words=3,
+        font="Montserrat", font_weight=900, caps=True, cap_size=112, cap_words=3,
         colors=dict(text="#FFFFFF", emph="#FFD400", stroke="#000000", accent="#FFD400"),
         hook_style="slam", cam_gap=4.4, snap_on_emph=False, graphics_density=0.3,
         framings=["medium", "close", "medium", "wide"], sfx_level=0.45, push=0.04,

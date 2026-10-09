@@ -103,7 +103,13 @@
   const hookSpans = hw.map((w) => mk("span", "hw", hookEl, esc(S.caps ? w.toUpperCase() : w)));
   hookSpans.forEach((sp, i) => tl.set(sp, { opacity: 0 }, 0));
   const st = S.hook_style;
-  if (st === "slam") {
+  if (st === "slam" && S.id === "V1") {          // «дорогая» подача: слова плавно поднимаются, без наезда
+    hookEl.classList.add("slam");
+    hookSpans.forEach((sp, i) => {
+      if (i === hookBest) sp.style.color = C.accent;
+      tl.fromTo(sp, { opacity: 0, y: 34 }, { opacity: 1, y: 0, duration: 0.4, ease: "power3.out", immediateRender: false }, 0.05 + i * 0.11);
+    });
+  } else if (st === "slam") {
     hookEl.classList.add("slam");
     hookSpans.forEach((sp, i) => {
       const t = 0.05 + i * 0.13;
@@ -164,26 +170,14 @@
 
   /* ---------- V1: нарисованный фон живёт (свечение дышит, диагональный блик, точки плывут), слова-подсказки за спиной ---------- */
   if (S.id === "V1") {
-    const glow = $("bgGlow"), dots = $("bgDots"), stripe = $("bgStripe"), bw = $("bgWord");
-    tl.fromTo(glow, { scale: 0.92 }, { scale: 1.12, duration: DUR, ease: "sine.inOut" }, 0);
-    tl.fromTo(dots, { y: 0 }, { y: 54, duration: Math.max(DUR, 1), ease: "none" }, 0);
-    for (let k = 0; k * 7.5 < DUR; k++) {          // блик проходит слева направо раз в ~7.5 с
-      tl.fromTo(stripe, { x: -700 }, { x: 700, duration: 2.2, ease: "power1.inOut", immediateRender: false }, 1.2 + k * 7.5);
+    const glow = $("bgGlow"), dots = $("bgDots"), stripe = $("bgStripe"), slab = $("bgSlab"), slab2 = $("bgSlab2");
+    tl.fromTo(glow, { scale: 0.94 }, { scale: 1.1, duration: DUR, ease: "sine.inOut" }, 0);
+    tl.fromTo(dots, { y: 0 }, { y: 60, duration: Math.max(DUR, 1), ease: "none" }, 0);
+    tl.fromTo([slab, slab2], { x: -900 }, { x: 0, duration: 0.7, ease: "power3.out", immediateRender: false }, 0);
+    tl.fromTo(slab, { y: 0 }, { y: 36, duration: DUR, ease: "sine.inOut" }, 0.7);
+    for (let k = 0; k * 8 < DUR; k++) {
+      tl.fromTo(stripe, { x: -700 }, { x: 700, duration: 2.0, ease: "power1.inOut", immediateRender: false }, 1.5 + k * 8);
     }
-    const picks = [];
-    plan.emphasis.forEach((i) => {                    // до 4 коротких смысловых слов, не чаще раза в 6.5 с, не во время хука
-      const w = tidy(words[i].w);
-      if (w.length < 4 || w.length > 10 || words[i].start < HOOK_T1 + 0.8 || words[i].start > DUR - 1.5) return;
-      if (picks.length && words[i].start - picks[picks.length - 1].t < 6.5) return;
-      if (picks.length < 4) picks.push({ w, t: words[i].start });
-    });
-    picks.forEach((p, k) => {
-      const el = mk("div", "bw", bw, esc(p.w.toUpperCase()));
-      el.style.fontSize = Math.min(300, 1000 / (p.w.length * 0.84)) + "px";
-      el.style.top = (330 + (k % 2) * 90) + "px";
-      tl.fromTo(el, { opacity: 0, scale: 1.18, y: 30 }, { opacity: 1, scale: 1, y: 0, duration: 0.45, ease: "power3.out", immediateRender: false }, p.t - 0.05);
-      tl.to(el, { opacity: 0, scale: 0.96, duration: 0.5, ease: "power2.in" }, p.t + 2.0);
-    });
   }
 
   /* ---------- глобус (canvas, ортографическая проекция, всё из t) ---------- */

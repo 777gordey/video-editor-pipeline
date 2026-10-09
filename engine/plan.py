@@ -230,6 +230,10 @@ def make_snaps(words, emphasis, style, cams):
 def make_sfx(plan, style, words):
     lvl = style["sfx_level"]
     sfx = [{"t": 0.05, "kind": "hit", "gain": round(1.0 * lvl, 2)}]
+    if style.get("premium"):                           # без «звука на каждый рез»: только вход и поп графики
+        for g in plan["graphics"]:
+            sfx.append({"t": g["t"], "kind": "pop", "gain": round(0.7 * lvl, 2)})
+        return sorted(sfx, key=lambda x: x["t"])
     for c in plan["cams"][1:]:
         if style["id"] in ("V1", "V2", "V4") or c["move"] == "whip":
             sfx.append({"t": round(max(0, c["t"] - 0.08), 3), "kind": "whoosh", "gain": round(0.8 * lvl, 2)})
