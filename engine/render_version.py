@@ -175,8 +175,16 @@ def main():
 
     with stage("hf_render"):
         raw = work / "render.mp4"
-        r = hyperframes(["render", "--output", str(raw.resolve()), "--fps", str(FPS), "--quality", a.quality,
-                         "--workers", str(a.workers)], proj)
+        r = None
+        for attempt in (1, 2):          # сторож: обычный рендер 5-16 мин; зависание (бывало) — не ждём 55 мин, пробуем ещё раз
+            try:
+                r = hyperframes(["render", "--output", str(raw.resolve()), "--fps", str(FPS), "--quality", a.quality,
+                                 "--workers", str(a.workers)], proj, timeout=1500)
+                break
+            except subprocess.TimeoutExpired:
+                print(f"RENDER WATCHDOG: hyperframes render exceeded 25 min (attempt {attempt}), {'retrying' if attempt == 1 else 'giving up'}", flush=True)
+        if r is None:
+            raise SystemExit("hyperframes render timed out twice")
         if r.returncode != 0 or not raw.exists():
             raise SystemExit(f"hyperframes render failed (exit {r.returncode})")
 
