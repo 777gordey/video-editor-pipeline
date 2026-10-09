@@ -114,7 +114,7 @@ video.layer{{object-fit:cover}}
   color:var(--text);{'text-transform:uppercase;' if style['caps'] else ''}word-spacing:.05em}}
 .chunk .w{{display:inline-block;opacity:0;margin:0 .1em}}
 .chunk .w.emph{{margin:0 .26em}}
-#hook{{position:absolute;left:60px;top:250px;width:960px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 20px;
+#hook{{position:absolute;left:50px;top:250px;width:980px;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:0 20px;
   text-align:center;font-family:'{style['font']}',sans-serif;font-weight:{style['font_weight']}}}
 #hook .hw{{display:inline-block;opacity:0;line-height:1.1}}
 #graphics .g{{position:absolute;opacity:0}}
