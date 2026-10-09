@@ -106,7 +106,7 @@ def check_captions(plan, words):
     order = all(words[i]["start"] <= words[i + 1]["start"] + 1e-3 for i in range(n - 1))
     res.append(("caption times monotonic (transcript order)", order, ""))
     hook = plan.get("hook", {})
-    ht = len((hook.get("text") or "").split())
+    ht = len(__import__("hookcheck").tokens(hook.get("text") or ""))
     res.append(("hook <= 6 words", 1 <= ht <= 6, f"{ht} words: «{hook.get('text','')}»"))
     if hook.get("from_caption"):
         res.append(("hook self-check (not a fragment, no loose ending, grounded)", True, "hook given by the user in the caption — not checked"))

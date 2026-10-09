@@ -7,6 +7,7 @@ not in the author's speech (numbers or content words that never occur in the tra
 import re
 
 MAX_WORDS = 6
+MAX_CHARS = 38        # длиннее — шрифт хука падает ниже читаемого на телефоне
 
 END_BAD = set("""в во на с со к ко у о об обо от ото до по за из изо для про при без над под через между перед после
 и а но или либо да что чтобы как если когда пока потому хотя ведь же ли бы не ни то лишь только даже уж
@@ -39,6 +40,8 @@ def problems(text, transcript_words=None, other_hooks=()):
         return ["empty"]
     if len(tk) > MAX_WORDS:
         out.append(f"{len(tk)} words (>6)")
+    if len(t) > MAX_CHARS:
+        out.append(f"{len(t)} characters (>{MAX_CHARS}: too long to read big on a phone)")
     if len(tk) < 2 and not t.endswith("?"):
         out.append("single word")
     if re.search(r"[,:;\-–—…]$", t) or t.endswith(".."):

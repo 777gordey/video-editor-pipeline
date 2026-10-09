@@ -332,7 +332,7 @@ def semantic_check(plan, n_words):
     h = plan["hook"]
     if not (0 <= h["first"] <= h["last"] < n_words):
         raise ValueError("hook indices out of range")
-    if len(str(h.get("text", "")).split()) > 6:
+    if len(__import__("hookcheck").tokens(str(h.get("text", "")))) > 6:
         raise ValueError("hook longer than 6 words")
     for i in plan["emphasis"]:
         if i >= n_words:

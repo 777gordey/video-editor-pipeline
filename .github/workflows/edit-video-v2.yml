@@ -94,7 +94,7 @@ jobs:
           cache-dependency-path: engine/requirements.txt
 
       - name: System deps
-        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
 
       - name: Python deps
         run: pip install -r engine/requirements.txt
@@ -181,7 +181,7 @@ jobs:
           cache: pip
           cache-dependency-path: engine/requirements.txt
       - name: System deps
-        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
       - name: Python deps
         run: pip install -r engine/requirements.txt
       - uses: actions/download-artifact@v4
@@ -223,7 +223,7 @@ jobs:
           cache-dependency-path: engine/package-lock.json
 
       - name: System deps
-        run: sudo apt-get update -y && sudo apt-get install -y ffmpeg
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
 
       - name: Python deps
         run: pip install -r engine/requirements.txt

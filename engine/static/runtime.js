@@ -92,10 +92,10 @@
   const hookMax = Math.max(...hw.map((x) => x.length));
   const HN = plan.hook.text.length;
   let hookSize = 56, bestSz = 0;
-  for (let L = 1; L <= 3; L++) {                      // число строк, при котором шрифт получается КРУПНЕЕ всего (поле 920x440)
+  for (let L = 1; L <= 4; L++) {                      // число строк, при котором шрифт получается КРУПНЕЕ всего (поле 920x440)
     const perLine = Math.max(Math.ceil(HN / L) + (L > 1 ? 0.5 * hookMax : 0), hookMax);
     const avail = 920 - (S.hook_style === "pastel" ? 110 * Math.ceil(hw.length / L) : 0);     // у пастели «таблетки» с полями
-    const sz = Math.min(hookBase, avail / (perLine * CW * 1.12), 440 / (1.15 * L));
+    const sz = Math.min(hookBase, avail / (perLine * CW * 1.12), 520 / (1.15 * L));
     if (sz > bestSz * 1.08) { bestSz = sz; hookSize = Math.max(56, sz); }
   }
   const hookBest = hw.reduce((bi, x, i) => (x.length > hw[bi].length ? i : bi), 0);   // подсвечиваем самое «мясное» слово
