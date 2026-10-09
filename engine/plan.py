@@ -147,6 +147,8 @@ def place_graphics(cands, words, style, dur):
         t = words[g["word"]]["start"]
         if t < 2.3 or t > dur - 1.0 or t - last < gap:
             continue
+        if style.get("premium") and g["kind"] == "globe":      # у «дорогого» V1 глобус не нужен
+            continue
         d = {"globe": 2.0, "circle": 1.7, "icon": 1.4}[g["kind"]]
         item = {"t": round(t, 3), "kind": g["kind"], "word": g["word"], "dur": d}
         if g["kind"] == "circle":
@@ -159,6 +161,10 @@ def place_graphics(cands, words, style, dur):
             item["text"] = str(g["text"])[:40]
         out.append(item)
         last = t
+    limit = max(1, round(dur / 8 * style["graphics_density"]))      # мало и по делу: ~1 графика на 8 с при плотности 1.0
+    if len(out) > limit:
+        keep = sorted({round(i * (len(out) - 1) / max(limit - 1, 1)) for i in range(limit)})
+        out = [out[i] for i in keep]
     return out
 
 
