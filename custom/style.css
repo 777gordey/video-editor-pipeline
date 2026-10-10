@@ -1,0 +1,43 @@
+:root{--bg0:#04101c;--bg1:#0a2236;--mint:#3CF0C8;--coral:#FF5A6A;--gold:#FFC94D;--ice:#CFE9FF;--ink:#04101c}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+#root{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:'Montserrat',sans-serif;color:#fff}
+#cam,#snap,#scene{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:50% 36%}
+#scene{isolation:isolate;overflow:hidden;background:var(--bg0)}
+.abs{position:absolute}
+video.layer{position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover}
+#inv{mix-blend-mode:multiply} #pb{mix-blend-mode:screen}
+#bgBase{position:absolute;left:0;top:0;width:1080px;height:1920px;background:radial-gradient(ellipse 900px 1100px at 50% 34%,#0e3a52 0%,#0a2236 45%,#04101c 100%)}
+.blob{position:absolute;border-radius:50%;filter:blur(90px);opacity:.55;color:#1ec8b0;background:radial-gradient(closest-side,currentColor,transparent)}
+#floor{position:absolute;left:-400px;top:1180px;width:1880px;height:1600px;transform-origin:50% 0;transform:perspective(900px) rotateX(74deg);
+  background-image:linear-gradient(rgba(60,240,200,.35) 2px,transparent 2px),linear-gradient(90deg,rgba(60,240,200,.35) 2px,transparent 2px);background-size:110px 110px;opacity:.22;
+  -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 100%);mask-image:linear-gradient(180deg,transparent 0,#000 40%,#000 100%)}
+#dust i{position:absolute;width:6px;height:6px;border-radius:50%;background:#bff;opacity:.5}
+#behind,#front{position:absolute;left:0;top:0;width:1080px;height:1920px}
+.o{position:absolute;opacity:0;visibility:hidden}
+/* 3D extruded text */
+.x3d{position:absolute;white-space:nowrap;font-family:'Unbounded',sans-serif;font-weight:900;line-height:1;transform-style:preserve-3d;text-align:center}
+.x3d .ch{display:inline-block;position:relative;transform-origin:50% 60%}
+.x3d .ch .sp{display:inline-block;visibility:hidden}
+.x3d .ch .l{position:absolute;left:0;top:0;white-space:pre}
+.x3d .ch .f{position:absolute;left:0;top:0;white-space:pre;color:transparent;
+  background:linear-gradient(180deg,#ffffff 0%,#dff3ff 30%,#7fb2d6 49%,#f2fdff 52%,#9ac4e2 78%,#e8f8ff 100%);-webkit-background-clip:text;background-clip:text}
+.x3d.gold .ch .f{background:linear-gradient(180deg,#fff7d1 0%,#ffe27a 30%,#d79a1f 49%,#ffe9a0 52%,#e0a52b 78%,#fff0b8 100%);-webkit-background-clip:text;background-clip:text}
+.x3d.mint .ch .f{background:linear-gradient(180deg,#eafff9 0%,#8ff7df 30%,#1db99b 49%,#b6ffee 52%,#27c9a8 78%,#e6fffa 100%);-webkit-background-clip:text;background-clip:text}
+.x3d.coral .ch .f{background:linear-gradient(180deg,#fff0f1 0%,#ff9aa5 30%,#e03d52 49%,#ffb4bc 52%,#e8546a 78%,#ffe3e6 100%);-webkit-background-clip:text;background-clip:text}
+.shine{position:absolute;left:0;top:0;white-space:pre;color:transparent;pointer-events:none;
+  background:linear-gradient(110deg,transparent 0%,transparent 42%,rgba(255,255,255,.95) 50%,transparent 58%,transparent 100%);background-size:260% 100%;background-position:130% 0;-webkit-background-clip:text;background-clip:text}
+/* captions */
+#caps{position:absolute;left:40px;top:1540px;width:1000px;height:240px}
+.cap{position:absolute;left:0;top:50%;width:100%;text-align:center;font-weight:800;font-size:68px;line-height:1.12;text-transform:uppercase;opacity:0;visibility:hidden;transform:translateY(-50%);letter-spacing:.005em}
+.cap .w{display:inline-block;margin:0 .13em;color:#fff;text-shadow:0 4px 0 rgba(0,0,0,.45),0 8px 28px rgba(0,0,0,.55);-webkit-text-stroke:0}
+.cap .w.k{color:var(--ink);background:var(--mint);padding:.01em .2em;border-radius:.22em;text-shadow:none;box-shadow:0 10px 30px rgba(60,240,200,.35);margin:0 .2em}
+.cap .w.k.red{background:var(--coral);color:#fff}
+/* ui objects */
+.card{position:absolute;border-radius:44px;background:linear-gradient(160deg,rgba(22,58,86,.92),rgba(7,24,42,.92));border:2px solid rgba(160,230,255,.35);
+  box-shadow:0 40px 90px rgba(0,0,0,.5),inset 0 2px 0 rgba(255,255,255,.3)}
+.glow{filter:drop-shadow(0 0 28px rgba(60,240,200,.6))}
+#flash{position:absolute;left:0;top:0;width:1080px;height:1920px;background:#fff;opacity:0;visibility:hidden}
+#fx{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none}
+#vign{position:absolute;left:0;top:0;width:1080px;height:1920px;background:radial-gradient(ellipse at 50% 46%,rgba(0,0,0,0) 54%,rgba(0,0,0,.55) 100%)}
+#grain{position:absolute;left:-60px;top:-60px;width:1200px;height:2040px;opacity:.09;mix-blend-mode:overlay;background-size:300px 300px}

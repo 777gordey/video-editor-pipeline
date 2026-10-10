@@ -1,0 +1,130 @@
+name: Custom edit (hand-built reel)
+
+# Manual hand-built edit of ONE clip (no cuts, no speed change). Branch custom-edit only.
+# The raw clip is never committed: it is fetched from the secret CUSTOM_CLIP_URL (masked) and only the FINISHED video is uploaded (1-day retention).
+run-name: Custom edit ${{ github.event.inputs.tag || github.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Round label, e.g. r1"
+        required: false
+        default: "r1"
+      quality:
+        description: "hyperframes quality: draft | looks | standard"
+        required: false
+        default: "standard"
+  push:
+    branches: [custom-edit]
+    paths: ["custom/run.trigger"]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  HYPERFRAMES_NO_TELEMETRY: "1"
+  HYPERFRAMES_NO_UPDATE_CHECK: "1"
+  HF_CAPTURE_PARALLEL_STREAM: "true"
+  PYTHONUNBUFFERED: "1"
+  QUALITY: ${{ github.event.inputs.quality || 'standard' }}
+
+jobs:
+  part:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { n: 1, a: "0.000", b: "26.900" }
+          - { n: 2, a: "26.900", b: "54.200" }
+          - { n: 3, a: "54.200", b: "72.034" }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: System deps
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
+      - name: Python deps
+        run: pip install onnxruntime==1.20.1 "numpy<2.3" "opencv-python-headless<5"
+      - name: HyperFrames (pinned)
+        working-directory: engine
+        run: npm ci --no-audit --no-fund && npx --no-install hyperframes --version
+      - name: Download clip (masked)
+        env:
+          CLIP_URL: ${{ secrets.CUSTOM_CLIP_URL }}
+        run: |
+          test -n "$CLIP_URL" || { echo "secret CUSTOM_CLIP_URL missing"; exit 1; }
+          echo "::add-mask::$CLIP_URL"
+          curl -sS -f -L --retry 3 "$CLIP_URL" -o source.mp4
+          ffprobe -v error -show_entries stream=width,height,r_frame_rate:format=duration -of csv=p=0 source.mp4
+      - name: Layers (cut-out only for this range)
+        run: PYTHONPATH=engine python custom/make_layers.py source.mp4 ${{ matrix.a }} ${{ matrix.b }} work/L
+      - name: Build composition
+        run: |
+          cp engine/static/gsap.min.js custom/gsap.min.js
+          python custom/build.py --fonts engine/static/fonts --a ${{ matrix.a }} --b ${{ matrix.b }} --out work/proj --layers work/L
+      - name: Lint
+        working-directory: work/proj
+        run: ../../engine/node_modules/.bin/hyperframes lint || true
+      - name: Render part ${{ matrix.n }}
+        working-directory: work/proj
+        run: |
+          mkdir -p ../../out
+          timeout 3000 ../../engine/node_modules/.bin/hyperframes render --output ../../out/part${{ matrix.n }}.mp4 --fps 30 --quality "$QUALITY" --workers 4
+          free -m
+      - name: Stills of this part (every 2 s)
+        run: ffmpeg -y -loglevel error -i out/part${{ matrix.n }}.mp4 -vf "fps=1/2,scale=270:-1,tile=8x2" -frames:v 1 out/sheet${{ matrix.n }}.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part${{ matrix.n }}
+          path: |
+            out/part${{ matrix.n }}.mp4
+            out/sheet${{ matrix.n }}.jpg
+          retention-days: 1
+          if-no-files-found: error
+
+  assemble:
+    needs: part
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: System deps
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
+      - name: Download clip (voice only is used)
+        env:
+          CLIP_URL: ${{ secrets.CUSTOM_CLIP_URL }}
+        run: |
+          echo "::add-mask::$CLIP_URL"
+          curl -sS -f -L --retry 3 "$CLIP_URL" -o source.mp4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part*
+          path: parts
+          merge-multiple: true
+      - name: Audio (voice + ducked music + SFX, once over the whole timeline)
+        run: python3 custom/mix.py source.mp4 custom/assets mix.m4a
+      - name: Stitch parts + mux
+        run: |
+          ls -la parts
+          printf "file 'parts/part1.mp4'\nfile 'parts/part2.mp4'\nfile 'parts/part3.mp4'\n" > list.txt
+          ffmpeg -y -loglevel error -f concat -safe 0 -i list.txt -i mix.m4a -map 0:v:0 -map 1:a:0 \
+            -vf "format=yuv420p" -c:v libx264 -preset medium -crf 18 -r 30 -c:a copy -movflags +faststart -t 72.034 final.mp4
+          ffprobe -v error -show_entries format=duration,size -of csv=p=0 final.mp4
+          ffmpeg -y -loglevel error -i final.mp4 -vf "fps=1/3,scale=216:-1,tile=8x3" -frames:v 1 contact.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-${{ github.event.inputs.tag || 'r1' }}
+          path: |
+            final.mp4
+            contact.jpg
+            parts/sheet*.jpg
+          retention-days: 1
+          if-no-files-found: error
