@@ -1,0 +1,29 @@
+:root{--org:#FF8A1F;--pink:#FF4F9A;--ink:#141018}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+#root{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:'Rubik',sans-serif;color:#fff}
+#snap{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:50% 0%;will-change:transform}
+#cam{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:0 0}
+#cam video{position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover}
+.layer{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none}
+
+/* hook: handwritten label -> wide mono block -> orange sticker */
+.hk{position:absolute;white-space:nowrap;text-align:center;line-height:1;opacity:0;visibility:hidden}
+.hk.h1{font-family:'Caveat',cursive;font-weight:700;color:#FF4F9A;-webkit-text-stroke:.09em #141018;paint-order:stroke fill;text-shadow:0 .05em 0 #141018,0 .1em .3em rgba(0,0,0,.5)}
+.hk.h2{font-family:'Rubik Mono One',sans-serif;font-weight:400;color:#fff;-webkit-text-stroke:.1em #141018;paint-order:stroke fill;text-shadow:0 .07em 0 #141018,0 .12em .3em rgba(0,0,0,.5)}
+.hk.h3{font-family:'Rubik',sans-serif;font-weight:800;color:#141018;background:#FF8A1F;padding:.12em .3em;border-radius:.22em;border:.07em solid #fff;box-shadow:0 .08em 0 #141018,0 .16em .35em rgba(0,0,0,.45)}
+
+/* captions: Rubik 800 comic subtitle / Rubik Mono One orange punch word / PT Serif italic pink for emotion */
+.cap{position:absolute;left:0;width:1080px;text-align:center;white-space:nowrap;line-height:1.2;opacity:0;visibility:hidden}
+.cap .w{display:inline-block;margin:0 .14em;color:#fff;font-family:'Rubik',sans-serif;font-weight:800;letter-spacing:-.01em;-webkit-text-stroke:.12em #141018;paint-order:stroke fill;
+  text-shadow:0 .07em 0 #141018;transform-origin:50% 60%;vertical-align:middle}
+.cap .w.k{font-family:'Rubik Mono One',sans-serif;font-weight:400;font-size:.8em;text-transform:uppercase;color:#FF8A1F;letter-spacing:-.02em;margin:0 .2em;-webkit-text-stroke:.14em #141018}
+.cap .w.e{font-family:'PT Serif',serif;font-style:italic;font-weight:700;font-size:1.3em;margin:0 .2em;color:#FF4F9A;-webkit-text-stroke:.1em #141018}
+.cap .w.c-red{color:#FF4F9A}.cap .w.c-vio{color:#FFD21F}
+
+/* stickers: die-cut white outline made of flat drop-shadows (no gradients) */
+.stk{position:absolute;opacity:0;visibility:hidden;overflow:visible;
+  filter:drop-shadow(5px 0 0 #fff) drop-shadow(-5px 0 0 #fff) drop-shadow(0 5px 0 #fff) drop-shadow(0 -5px 0 #fff) drop-shadow(0 16px 14px rgba(0,0,0,.45))}
+.stk svg{display:block;overflow:visible}
+.stk text{font-family:'Rubik Mono One',sans-serif;text-anchor:middle;dominant-baseline:central}
+.zz{position:absolute;font-family:'Rubik',sans-serif;font-weight:800;color:#fff;-webkit-text-stroke:.14em #141018;paint-order:stroke fill;opacity:0}
