@@ -8,16 +8,27 @@ from fontTools.ttLib import TTFont
 
 HERE = Path(__file__).resolve().parent
 CUTS = [5.73, 7.53, 12.17, 15.3, 17.93, 21.1, 25.0, 25.6, 38.5, 41.1, 68.1]  # jump cuts already in the clip
-PUNCH_CUTS = [7.53, 17.93]                                                   # cuts without a transition: tiny punch-in
-TRANS = [{'t': 5.95, 'type': 'sweep'}, {'t': 12.15, 'type': 'zoom'}, {'t': 15.4, 'type': 'push'}, {'t': 21.05, 'type': 'flare'}]
-# zoom plan (global seconds, scale): push-ins on key phrases, pull-outs on idea changes, slow drift between. <= 1.15
-ZK = [(0, 1.0), (2.4, 1.07), (5.6, 1.10), (6.7, 1.01), (8.2, 1.02), (10.9, 1.12), (12.0, 1.12), (12.9, 1.02), (14.2, 1.04), (15.3, 1.13),
-      (16.3, 1.02), (18.7, 1.05), (20.6, 1.13), (21.7, 1.02), (23.3, 1.05), (24.9, 1.13), (25.9, 1.03), (31.0, 1.05), (33.2, 1.12), (35.3, 1.12),
-      (36.6, 1.02), (40.0, 1.06), (41.6, 1.10), (43.0, 1.10), (44.3, 1.02), (47.9, 1.02), (49.0, 1.12), (50.5, 1.12), (51.6, 1.03), (54.8, 1.05),
-      (55.9, 1.12), (58.0, 1.12), (59.2, 1.14), (61.0, 1.14), (62.2, 1.02), (64.0, 1.02), (66.0, 1.12), (67.6, 1.12), (68.6, 1.02), (71.6, 1.08)]
-STK = [  # global seconds: appear, leave, icon (at most one per ~4-5 s, none over eyes/mouth: slot chosen from the face track)
-    {'t': 4.00, 'e': 5.50, 'type': 'stopwatch'}, {'t': 9.70, 'e': 11.30, 'type': 'magnify'}, {'t': 13.70, 'e': 15.20, 'type': 'one'},
-    {'t': 19.15, 'e': 20.80, 'type': 'question'}, {'t': 23.50, 'e': 25.00, 'type': 'bell'},
+PUNCH_CUTS = []                                                   # cuts without a transition: tiny punch-in
+# zoom plan (global seconds, scale), range 1.00-1.28, alternating wide / close, eased.
+# 0-20 s: moves of >= 10 % are listed by camera_moves() below (cutaways hide some of the motion on purpose).
+ZK_TEST = [(0.0, 1.00), (2.4, 1.18), (3.4, 1.18), (4.4, 1.04), (5.4, 1.26), (7.3, 1.05), (8.6, 1.05), (10.9, 1.25), (12.0, 1.25), (12.9, 1.03),
+           (13.3, 1.03), (15.2, 1.20), (16.2, 1.03), (17.8, 1.26), (19.7, 1.06), (20.0, 1.06)]
+ZK_REST = [(20.6, 1.26), (21.7, 1.03), (23.3, 1.05), (24.9, 1.27), (25.9, 1.04), (31.0, 1.08), (33.2, 1.24), (35.3, 1.24), (36.6, 1.03), (40.0, 1.10),
+           (41.6, 1.22), (43.0, 1.22), (44.3, 1.03), (47.9, 1.03), (49.0, 1.25), (50.5, 1.25), (51.6, 1.05), (54.8, 1.08), (55.9, 1.24), (58.0, 1.24),
+           (59.2, 1.28), (61.0, 1.28), (62.2, 1.03), (64.0, 1.03), (66.0, 1.24), (67.6, 1.24), (68.6, 1.03), (71.6, 1.12)]
+ZK = ZK_TEST + ZK_REST
+ZMAX = 1.30
+# stock cutaways (Pexels, free for commercial use, fetched on the runner by custom2/stock.py, never committed). Card 960x720, rounded.
+CUTAWAYS = [
+    {'n': 1, 't': 5.50, 'e': 7.30, 'pexels': 8625399, 'ss': 4.6, 'sfx': 'horse_neigh', 'sfx_t': 5.78, 'what': 'trotting horse (for «копыта»)'},
+    {'n': 2, 't': 13.40, 'e': 15.20, 'pexels': 38057445, 'ss': 4.0, 'sfx': 'ding_chime', 'sfx_t': 13.75, 'what': 'reception handshake («первая часть услуги»)'},
+    {'n': 3, 't': 17.90, 'e': 19.70, 'pexels': 7685810, 'ss': 8.0, 'sfx': 'boom_low', 'sfx_t': 18.95, 'what': 'customer leaving through a door («вернётся или нет»)'},
+]
+CARD = {'w': 960, 'h': 720, 'x': 60, 'y': 430}
+TRANS = [{'t': 12.15, 'type': 'sweep'}, {'t': 21.05, 'type': 'flare'}] + [{'t': c[k], 'type': 'zoom', 'cut': c['n']} for c in CUTAWAYS for k in ('t', 'e')]
+STK = [  # global seconds: appear, leave, icon (none inside cutaways; slot chosen from the face track, never over eyes/mouth)
+    {'t': 3.30, 'e': 5.20, 'type': 'stopwatch'}, {'t': 9.60, 'e': 11.40, 'type': 'magnify'}, {'t': 15.55, 'e': 17.30, 'type': 'one'},
+    {'t': 20.20, 'e': 21.90, 'type': 'question'}, {'t': 23.50, 'e': 25.00, 'type': 'bell'},
     {'t': 38.70, 'e': 40.50, 'type': 'price'}, {'t': 43.40, 'e': 45.30, 'type': 'calendar'},
     {'t': 59.20, 'e': 61.80, 'type': 'clock', 'mturn': 0, 'h0': 180, 'h1': 180}, {'t': 66.30, 'e': 67.90, 'type': 'check'}]
 KEY = {'быстрее', 'скорость', 'тон', 'единственное', 'визита', 'первая', 'услуги', 'плохо', 'вернется', 'гудка', 'секунды', 'клиент', 'системы',
@@ -143,7 +154,7 @@ def cam_path(face, a, b, step=0.1):
             else:
                 tgt = tuple(f)
             st = list(tgt) if st is None else [st[j] + (tgt[j] - st[j]) * (1 - math.exp(-step / 0.5)) for j in range(3)]
-            z = min(1.15, zoom(tt) * (1 + 0.008 * math.sin(2 * math.pi * tt / 7.0)))
+            z = min(ZMAX, zoom(tt) * (1 + 0.008 * math.sin(2 * math.pi * tt / 7.0)))
             wx = min(max(st[0] - 0.5 / z, 0), 1 - 1 / z)
             wy = min(max(st[1] - 0.40 / z, 0), 1 - 1 / z)
             out.append((round(tt, 3) if not first else round(tt, 3), round(z, 4), round(-wx * 1080 * z, 1), round(-wy * 1920 * z, 1), st[:]))
@@ -163,6 +174,7 @@ def main():
     ap.add_argument('--fonts', default=str(HERE / 'fonts'))
     ap.add_argument('--gsap', default=str(HERE.parent / 'src' / 'gsap.min.js'))
     ap.add_argument('--data', default=str(HERE))
+    ap.add_argument('--cutdir', default=None, help='dir with cut1.mp4.. (960x720 stock segments)')
     a = ap.parse_args()
     D = Path(a.data)
     A, B = a.a, a.b
@@ -261,7 +273,10 @@ def main():
     for text, size, acc in hs:
         lines.append({'text': text, 'size': size, 'y': round(y + size / 2), 'acc': acc})
         y += size + gap
-    plan = {'off': A, 'dur': dur, 'cam': camrows, 'caps': caps, 'stk': stk,
+    cuts = [dict(c, card=CARD) for c in CUTAWAYS if c['e'] > A and c['t'] < B] if a.cutdir else []
+    for c in cuts:
+        shutil.copy2(Path(a.cutdir) / f"cut{c['n']}.mp4", proj / 'media' / f"cut{c['n']}.mp4")
+    plan = {'off': A, 'cuts': cuts, 'dur': dur, 'cam': camrows, 'caps': caps, 'stk': stk,
             'tr': [t for t in TRANS], 'punch': [[t, 0.045] for t in PUNCH_CUTS],
             'hook': {'t0': HOOK_T0, 't1': HOOK_T1, 'lines': lines, 'gy': gy} if A <= HOOK_T0 else None}
     fonts = []
@@ -272,6 +287,9 @@ def main():
             fonts.append(f"@font-face{{font-family:'Onest';font-weight:{wgt};font-style:normal;src:url('fonts/onest-{sc}-{wgt}-normal.woff2') format('woff2');unicode-range:{rng};font-display:block}}")
     css = (HERE / 'style2.css').read_text(encoding='utf-8')
     js = (HERE / 'scene2.js').read_text(encoding='utf-8')
+    cutvids = ''.join(
+        f'<div id="card{c["n"]}" class="card" style="left:{CARD["x"]}px;top:{CARD["y"]}px;width:{CARD["w"]}px;height:{CARD["h"]}px"><video id="cv{c["n"]}" src="media/cut{c["n"]}.mp4" muted playsinline data-start="{max(0, c["t"] - A):.3f}" data-duration="{min(c["e"], B) - max(c["t"], A):.3f}" data-track-index="{5 + c["n"]}"></video></div>'
+        for c in cuts)
     html = f"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=1080, height=1920">
 <script src="gsap.min.js"></script>
@@ -281,8 +299,7 @@ def main():
 </style></head>
 <body>
 <div id="root" data-composition-id="main" data-start="0" data-duration="{dur}" data-width="1080" data-height="1920">
-  <div id="snap"><div id="cam"><video id="v" src="media/clip.mp4" muted playsinline data-start="0" data-duration="{dur}" data-track-index="1"></video></div></div>
-  <div id="warm" class="layer"></div><div id="vign" class="layer"></div><div id="shade" class="layer"></div>
+  <div id="snap"><div id="cam"><video id="v" src="media/clip.mp4" muted playsinline data-start="0" data-duration="{dur}" data-track-index="1"></video></div><div id="cutl" class="layer">{cutvids}</div></div>
   <div id="over" class="layer"></div>
   <div id="fx"></div><div id="flash"></div>
 </div>

@@ -192,5 +192,17 @@ const TR = {
   tl.fromTo(SNAP, { scale: 1 + a }, { scale: 1, duration: 0.45, ease: 'power3.out', immediateRender: false }, T(t));
 });
 
+/* ---------------- stock cutaways: rounded card, zoom-through in and out (transitions come from P.tr) ---------------- */
+(P.cuts || []).forEach(c => {
+  const n = $('card' + c.n);
+  if (!n || !here(c.t, c.e)) return;
+  n.classList.add('o');
+  gs.set(n, { autoAlpha: 0 });
+  tl.set(n, { autoAlpha: 1 }, T(c.t));
+  tl.set(n, { autoAlpha: 0 }, T(c.e));
+  tl.fromTo(n, { scale: 1.07, rotation: c.n % 2 ? -1.5 : 1.5 }, { scale: 1, rotation: 0, duration: 0.5, ease: 'power3.out', immediateRender: false }, T(c.t));
+  tl.to(n, { scale: 1.035, duration: Math.max(0.3, c.e - c.t - 0.5), ease: 'none' }, T(c.t) + 0.5);
+});
+
 window.__timelines = window.__timelines || {};
 window.__timelines['main'] = tl;

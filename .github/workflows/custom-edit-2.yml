@@ -64,7 +64,7 @@ jobs:
           node-version: "22"
       - name: System deps
         run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
-      - run: pip install fonttools brotli
+      - run: pip install fonttools brotli numpy
       - name: HyperFrames (pinned)
         working-directory: engine
         run: npm ci --no-audit --no-fund && npx --no-install hyperframes --version
@@ -79,8 +79,12 @@ jobs:
           mkdir -p work
           ffmpeg -y -loglevel error -ss ${{ matrix.a }} -t $(python3 -c "print(round(${{ matrix.b }}-${{ matrix.a }},3))") -i source.mp4 \
             -vf "scale=1080:1920:flags=lanczos,unsharp=5:5:0.6:5:5:0.0" -r 30 -an -c:v libx264 -crf 12 -preset fast -pix_fmt yuv420p work/range.mp4
+      - name: Stock cutaways (Pexels, fetched at render time, never committed)
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: python3 custom2/stock.py work/cuts work/stock_cache
       - name: Build composition
-        run: python3 custom2/build2.py --a ${{ matrix.a }} --b ${{ matrix.b }} --out work/proj --clip work/range.mp4 --fonts custom2/fonts --gsap engine/static/gsap.min.js --data custom2
+        run: python3 custom2/build2.py --cutdir work/cuts --a ${{ matrix.a }} --b ${{ matrix.b }} --out work/proj --clip work/range.mp4 --fonts custom2/fonts --gsap engine/static/gsap.min.js --data custom2
       - name: Lint
         working-directory: work/proj
         run: ../../engine/node_modules/.bin/hyperframes lint || true
@@ -110,7 +114,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install fonttools brotli
+      - run: pip install fonttools brotli numpy
       - name: System deps
         run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
       - name: Download clip (voice only is used)
