@@ -1,0 +1,39 @@
+:root{--acc:#D4FF3F;--ink:#0b0f08}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+#root{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:'Onest',sans-serif;color:#fff}
+#snap{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:50% 40%;will-change:transform}
+#cam{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:0 0}
+#cam video{position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover;filter:contrast(1.05) saturate(1.07) brightness(1.015)}
+#warm{position:absolute;left:0;top:0;width:1080px;height:1920px;background:linear-gradient(180deg,rgba(255,214,170,.05),rgba(255,214,170,0) 40%,rgba(10,20,40,.10));mix-blend-mode:soft-light;pointer-events:none}
+#vign{position:absolute;left:0;top:0;width:1080px;height:1920px;background:radial-gradient(ellipse at 50% 42%,rgba(0,0,0,0) 58%,rgba(0,0,0,.30) 100%);pointer-events:none}
+#shade{position:absolute;left:0;top:1180px;width:1080px;height:740px;background:linear-gradient(180deg,rgba(0,0,0,0),rgba(0,0,0,.34) 70%,rgba(0,0,0,.42));pointer-events:none}
+.layer{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none}
+.o{position:absolute;opacity:0;visibility:hidden}
+
+/* ---------- hook: 3D metal type ---------- */
+.x3d{position:absolute;white-space:nowrap;font-family:'Onest',sans-serif;font-weight:900;line-height:1;transform-style:preserve-3d;text-align:center;letter-spacing:-.02em}
+.x3d .ch{display:inline-block;position:relative;transform-origin:50% 60%}
+.x3d .ch .sp{display:inline-block;visibility:hidden}
+.x3d .ch .l{position:absolute;left:0;top:0;white-space:pre}
+.x3d .ch .f{position:absolute;left:0;top:0;white-space:pre;color:transparent;
+  background:linear-gradient(180deg,#ffffff 0%,#e9eef2 28%,#8e9aa6 49%,#f6f9fb 52%,#a7b3bd 80%,#eef3f6 100%);-webkit-background-clip:text;background-clip:text}
+.x3d.acc .ch .f{background:linear-gradient(180deg,#faffd9 0%,#e6ff7a 28%,#a9d315 49%,#f1ffb0 52%,#b9e220 80%,#f6ffc9 100%);-webkit-background-clip:text;background-clip:text}
+.x3d .ch .shine{position:absolute;left:0;top:0;white-space:pre;color:transparent;pointer-events:none;
+  background:linear-gradient(110deg,transparent 0%,transparent 42%,rgba(255,255,255,.95) 50%,transparent 58%,transparent 100%);background-size:260% 100%;background-position:130% 0;-webkit-background-clip:text;background-clip:text}
+.hookglow{position:absolute;border-radius:50%;filter:blur(70px);background:radial-gradient(closest-side,rgba(212,255,63,.30),transparent)}
+
+/* ---------- captions ---------- */
+.cap{position:absolute;left:0;width:1080px;text-align:center;white-space:nowrap;font-weight:900;text-transform:uppercase;letter-spacing:-.022em;line-height:1;opacity:0;visibility:hidden;
+  font-feature-settings:'kern' 1}
+.cap .w{display:inline-block;margin:0 .13em;color:#fff;text-shadow:0 .05em .26em rgba(0,0,0,.55),0 .01em .04em rgba(0,0,0,.45);transform-origin:50% 60%}
+.cap .w.k{color:var(--acc)}
+
+/* ---------- stickers ---------- */
+.stk{position:absolute;width:300px;height:300px;opacity:0;visibility:hidden;transform-origin:50% 50%}
+.stk svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 14px 22px rgba(0,0,0,.40))}
+.stk .num{font-family:'Onest',sans-serif;font-weight:900}
+
+/* ---------- transitions ---------- */
+#flash{position:absolute;left:0;top:0;width:1080px;height:1920px;background:#fff;opacity:0;visibility:hidden}
+#fx{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none;overflow:hidden}
