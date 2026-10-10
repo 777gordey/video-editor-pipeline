@@ -1,0 +1,162 @@
+name: Custom edit K3 (hard editorial, real footage)
+
+# K3: real footage untouched (no cut-out), no cuts, no speed change. Branch custom-edit only.
+# The raw clip is fetched from the masked secret CUSTOM_CLIP_URL and is never committed; only finished video is uploaded (1-day retention).
+run-name: Custom edit K3 ${{ github.sha }}
+
+on:
+  push:
+    branches: [custom-edit]
+    paths: ["custom_k3/run.trigger"]
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  HYPERFRAMES_NO_TELEMETRY: "1"
+  HYPERFRAMES_NO_UPDATE_CHECK: "1"
+  HF_CAPTURE_PARALLEL_STREAM: "true"
+  PYTHONUNBUFFERED: "1"
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.p.outputs.matrix }}
+      tag: ${{ steps.p.outputs.tag }}
+      a: ${{ steps.p.outputs.a }}
+      b: ${{ steps.p.outputs.b }}
+      quality: ${{ steps.p.outputs.quality }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: p
+        run: |
+          python3 - <<'PY'
+          import json, math, os
+          kv = dict(l.strip().split('=', 1) for l in open('custom_k3/run.trigger') if '=' in l)
+          a, b = float(kv['a']), float(kv['b'])
+          cuts = [a] + [float(x) for x in kv.get('splits', '').split(',') if x.strip()] + [b]
+          if len(cuts) == 2:
+              n = max(1, math.ceil((b - a) / 27.0)); cuts = [a + (b - a) * i / n for i in range(n)] + [b]
+          parts = [{'n': i + 1, 'a': f'{cuts[i]:.3f}', 'b': f'{cuts[i + 1]:.3f}'} for i in range(len(cuts) - 1)]
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('matrix=' + json.dumps({'include': parts}) + '\n')
+              for k in ('tag', 'quality'):
+                  f.write(f'{k}={kv.get(k, "t")}\n')
+              f.write(f'a={a}\nb={b}\n')
+          print(parts)
+          PY
+
+  part:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: System deps
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
+      - run: pip install fonttools brotli numpy
+      - name: HyperFrames (pinned)
+        working-directory: engine
+        run: npm ci --no-audit --no-fund && npx --no-install hyperframes --version
+      - name: Download clip (masked) and upscale the range (Lanczos + mild sharpen)
+        env:
+          CLIP_URL: ${{ secrets.CUSTOM_CLIP_URL_K3 }}
+        run: |
+          test -n "$CLIP_URL" || { echo "secret CUSTOM_CLIP_URL missing"; exit 1; }
+          echo "::add-mask::$CLIP_URL"
+          curl -sS -f -L --retry 3 "$CLIP_URL" -o source.mp4
+          echo "$(cat custom_k3/clip.sha256)  source.mp4" | sha256sum -c -
+          ffprobe -v error -show_entries stream=width,height,r_frame_rate:format=duration -of csv=p=0 source.mp4
+          mkdir -p work
+          ffmpeg -y -loglevel error -ss ${{ matrix.a }} -t $(python3 -c "print(round(${{ matrix.b }}-${{ matrix.a }},3))") -i source.mp4 \
+            -vf "scale=1080:1920:flags=lanczos,unsharp=5:5:0.6:5:5:0.0,eq=contrast=1.22:saturation=0.50:gamma=0.90,colorbalance=rs=-0.07:gs=-0.01:bs=0.08:rm=-0.06:bm=0.07:rh=-0.03:bh=0.05,curves=all='0/0 0.12/0.05 0.5/0.47 0.9/0.95 1/1',noise=alls=6:allf=t" -r 30 -an -c:v libx264 -crf 12 -preset fast -pix_fmt yuv420p work/range.mp4
+      - name: Build composition
+        run: cd custom_k3 && python3 build_k3.py --a ${{ matrix.a }} --b ${{ matrix.b }} --out ../work/proj --clip ../work/range.mp4 --fonts fonts --gsap ../engine/static/gsap.min.js
+      - name: Stock inserts (Pexels, fetched at render time, never committed)
+        env:
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+        run: cd custom_k3 && python3 stock_k3.py ../work/stock && cp ../work/stock/stock*.mp4 ../work/proj/media/
+      - name: Lint
+        working-directory: work/proj
+        run: ../../engine/node_modules/.bin/hyperframes lint || true
+      - name: Render part ${{ matrix.n }}
+        working-directory: work/proj
+        run: |
+          mkdir -p ../../out
+          timeout 3000 ../../engine/node_modules/.bin/hyperframes render --output ../../out/part${{ matrix.n }}.mp4 --fps 30 --quality ${{ needs.plan.outputs.quality }} --workers 4
+          free -m
+      - name: Stills of this part (every 2 s)
+        run: ffmpeg -y -loglevel error -i out/part${{ matrix.n }}.mp4 -vf "fps=1/2,scale=270:-1,tile=8x2" -frames:v 1 out/sheet${{ matrix.n }}.jpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part${{ matrix.n }}
+          path: |
+            out/part${{ matrix.n }}.mp4
+            out/sheet${{ matrix.n }}.jpg
+          retention-days: 1
+          if-no-files-found: error
+
+  assemble:
+    needs: [plan, part]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install fonttools brotli numpy
+      - name: System deps
+        run: for i in 1 2 3; do timeout 150 sudo apt-get update -y && timeout 240 sudo apt-get install -y --no-install-recommends ffmpeg && break; echo apt retry $i; done
+      - name: Download clip (voice only is used)
+        env:
+          CLIP_URL: ${{ secrets.CUSTOM_CLIP_URL_K3 }}
+        run: |
+          echo "::add-mask::$CLIP_URL"
+          curl -sS -f -L --retry 3 "$CLIP_URL" -o source.mp4
+          echo "$(cat custom_k3/clip.sha256)  source.mp4" | sha256sum -c -
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part*
+          path: parts
+          merge-multiple: true
+      - name: Audio (voice untouched + ducked music + very quiet SFX), level report
+        run: python3 custom_k3/mix_k3.py source.mp4 custom_k3/assets ${{ needs.plan.outputs.a }} ${{ needs.plan.outputs.b }} mix.m4a | tee levels.txt
+      - name: Stitch parts + mux
+        run: |
+          ls -la parts
+          for f in $(ls parts/part*.mp4 | sort -V); do echo "file '$f'" >> list.txt; done
+          D=$(python3 -c "print(round(${{ needs.plan.outputs.b }}-${{ needs.plan.outputs.a }},3))")
+          ffmpeg -y -loglevel error -f concat -safe 0 -i list.txt -i mix.m4a -map 0:v:0 -map 1:a:0 \
+            -vf "format=yuv420p" -c:v libx264 -preset medium -crf 18 -r 30 -c:a copy -movflags +faststart -t $D final.mp4
+          ffprobe -v error -show_entries format=duration,size -of csv=p=0 final.mp4
+          ffmpeg -y -loglevel error -i final.mp4 -vf "fps=1/2,scale=216:-1,tile=8x3" -frames:v 1 contact.jpg
+          ffmpeg -y -loglevel error -i final.mp4 -vf "scale=720:1280:flags=lanczos" -c:v libx264 -preset medium -b:v 1750k -maxrate 2100k -bufsize 4200k -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart preview.mp4
+          ls -l preview.mp4; test $(stat -c%s preview.mp4) -le 20000000
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preview-${{ needs.plan.outputs.tag }}
+          path: |
+            preview.mp4
+            levels.txt
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: final-${{ needs.plan.outputs.tag }}
+          path: |
+            final.mp4
+            contact.jpg
+          retention-days: 1
+          if-no-files-found: error
