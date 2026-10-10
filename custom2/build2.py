@@ -83,6 +83,13 @@ def group_caps(W, M):
     for i, w in enumerate(W):
         if cur and w['s'] - cur[-1]['e'] > 0.6:
             flush()
+        # a long word must not shrink the whole group: close the group first if it would drop below ~76 px
+        if cur and (M.em(' '.join(x['t'] for x in cur + [w]).upper()) + 0.26 * len(cur) + 0.04) > 12.2:
+            carry = []
+            while len(cur) > 1 and cur[-1]['n'] in STOP:
+                carry.insert(0, cur.pop())
+            flush()
+            cur = carry
         cur.append(w)
         end = w['raw'][-1] in '.?!' or (w['raw'][-1] == ',' and len(cur) >= 2) or len(cur) >= 3 or len(txt(cur)) > 19
         if end:
