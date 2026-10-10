@@ -36,9 +36,10 @@ jobs:
           import json, math, os
           kv = dict(l.strip().split('=', 1) for l in open('custom2/run.trigger') if '=' in l)
           a, b = float(kv['a']), float(kv['b'])
-          n = max(1, math.ceil((b - a) / 27.0))
-          step = (b - a) / n
-          parts = [{'n': i + 1, 'a': f'{a + i * step:.3f}', 'b': f'{(a + (i + 1) * step) if i < n - 1 else b:.3f}'} for i in range(n)]
+          cuts = [a] + [float(x) for x in kv.get('splits', '').split(',') if x.strip()] + [b]
+          if len(cuts) == 2:
+              n = max(1, math.ceil((b - a) / 27.0)); cuts = [a + (b - a) * i / n for i in range(n)] + [b]
+          parts = [{'n': i + 1, 'a': f'{cuts[i]:.3f}', 'b': f'{cuts[i + 1]:.3f}'} for i in range(len(cuts) - 1)]
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write('matrix=' + json.dumps({'include': parts}) + '\n')
               for k in ('tag', 'quality'):
@@ -139,7 +140,7 @@ jobs:
             -vf "format=yuv420p" -c:v libx264 -preset medium -crf 18 -r 30 -c:a copy -movflags +faststart -t $D final.mp4
           ffprobe -v error -show_entries format=duration,size -of csv=p=0 final.mp4
           ffmpeg -y -loglevel error -i final.mp4 -vf "fps=1/2,scale=216:-1,tile=8x3" -frames:v 1 contact.jpg
-          ffmpeg -y -loglevel error -i final.mp4 -vf "scale=720:1280:flags=lanczos" -c:v libx264 -preset medium -b:v 1850k -maxrate 2200k -bufsize 4400k -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart preview.mp4
+          ffmpeg -y -loglevel error -i final.mp4 -vf "scale=720:1280:flags=lanczos" -c:v libx264 -preset medium -b:v 1750k -maxrate 2100k -bufsize 4200k -pix_fmt yuv420p -c:a aac -b:a 96k -movflags +faststart preview.mp4
           ls -l preview.mp4; test $(stat -c%s preview.mp4) -le 20000000
       - uses: actions/upload-artifact@v4
         with:

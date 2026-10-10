@@ -8,28 +8,37 @@ html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
 .layer{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none}
 .o{position:absolute;opacity:0;visibility:hidden}
 
-/* ---------- hook: 3D metal type ---------- */
-.x3d{position:absolute;white-space:nowrap;font-family:'Onest',sans-serif;font-weight:900;line-height:1;transform-style:preserve-3d;text-align:center;letter-spacing:-.02em}
-.x3d .ch{display:inline-block;position:relative;transform-origin:50% 60%}
-.x3d .ch .sp{display:inline-block;visibility:hidden}
-.x3d .ch .l{position:absolute;left:0;top:0;white-space:pre}
-.x3d .ch .f{position:absolute;left:0;top:0;white-space:pre;color:transparent;
-  background:linear-gradient(180deg,#ffffff 0%,#e9eef2 28%,#8e9aa6 49%,#f6f9fb 52%,#a7b3bd 80%,#eef3f6 100%);-webkit-background-clip:text;background-clip:text}
-.x3d.acc .ch .f{background:linear-gradient(180deg,#faffd9 0%,#e6ff7a 28%,#a9d315 49%,#f1ffb0 52%,#b9e220 80%,#f6ffc9 100%);-webkit-background-clip:text;background-clip:text}
-.x3d .ch .shine{position:absolute;left:0;top:0;white-space:pre;color:transparent;pointer-events:none;
-  background:linear-gradient(110deg,transparent 0%,transparent 42%,rgba(255,255,255,.95) 50%,transparent 58%,transparent 100%);background-size:260% 100%;background-position:130% 0;-webkit-background-clip:text;background-clip:text}
-.hookglow{position:absolute;border-radius:50%;filter:blur(70px);background:radial-gradient(closest-side,rgba(212,255,63,.30),transparent)}
+/* ---------- hook: three different fonts, three separate hits ---------- */
+.hk{position:absolute;white-space:nowrap;text-align:center;line-height:1}
+.hk.h1{font-family:'Onest',sans-serif;font-weight:900;letter-spacing:-.022em;color:#fff;text-shadow:0 .09em 0 rgba(0,0,0,.38),0 .16em .45em rgba(0,0,0,.5)}
+.hk.h2{font-family:'Oswald',sans-serif;font-weight:700;letter-spacing:.01em;color:transparent;background:linear-gradient(180deg,#fbffd6 0%,#e4ff6a 38%,#b5e312 62%,#e9ff8f 100%);-webkit-background-clip:text;background-clip:text;
+  filter:drop-shadow(0 .05em 0 rgba(0,0,0,.5)) drop-shadow(0 0 .12em rgba(212,255,63,.4))}
+.hk.h3{font-family:'Playfair Display',serif;font-style:italic;font-weight:900;letter-spacing:-.01em;color:#FF4D5E;text-shadow:0 .07em 0 rgba(0,0,0,.42),0 .14em .4em rgba(0,0,0,.5)}
+.hku{position:absolute;height:9px;border-radius:5px;background:#fff;opacity:0;visibility:hidden;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 
-/* ---------- captions ---------- */
-.cap{position:absolute;left:0;width:1080px;text-align:center;white-space:nowrap;font-weight:900;text-transform:uppercase;letter-spacing:-.022em;line-height:1;opacity:0;visibility:hidden;
-  font-feature-settings:'kern' 1}
-.cap .w{display:inline-block;margin:0 .13em;color:#fff;text-shadow:0 .05em .26em rgba(0,0,0,.55),0 .01em .04em rgba(0,0,0,.45);transform-origin:50% 60%}
-.cap .w.k{color:var(--acc);margin:0 .24em}
+/* ---------- captions: normal = Onest; key = Oswald condensed (lime / cyan); emotional = Playfair italic, tilted (coral) ---------- */
+.cap{position:absolute;left:0;width:1080px;text-align:center;white-space:nowrap;line-height:1;opacity:0;visibility:hidden;font-feature-settings:'kern' 1}
+.cap .w{display:inline-block;margin:0 .12em;color:#fff;font-family:'Onest',sans-serif;font-weight:900;text-transform:uppercase;letter-spacing:-.022em;
+  text-shadow:0 .05em .26em rgba(0,0,0,.55),0 .01em .04em rgba(0,0,0,.45);transform-origin:50% 60%}
+.cap .w.k{font-family:'Oswald',sans-serif;font-weight:700;font-size:1.28em;letter-spacing:.01em;margin:0 .2em}
+.cap .w.e{font-family:'Playfair Display',serif;font-style:italic;font-weight:900;text-transform:none;font-size:1.24em;letter-spacing:-.01em;margin:0 .2em}
+.cap .w.c-lime{color:#D4FF3F}.cap .w.c-coral{color:#FF5A5F}.cap .w.c-cyan{color:#4FE3FF}
 
-/* ---------- stickers ---------- */
-.stk{position:absolute;width:300px;height:300px;opacity:0;visibility:hidden;transform-origin:50% 50%}
-.stk svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 14px 22px rgba(0,0,0,.40))}
-.stk .num{font-family:'Onest',sans-serif;font-weight:900}
+/* ---------- comic callouts ---------- */
+.co{position:absolute;opacity:0;visibility:hidden;transform-origin:50% 50%}
+.co svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;filter:drop-shadow(0 12px 0 rgba(0,0,0,.30)) drop-shadow(0 22px 30px rgba(0,0,0,.35))}
+.co svg text{font-family:'Oswald',sans-serif;font-weight:700;text-anchor:middle;dominant-baseline:central;paint-order:stroke;stroke-linejoin:round}
+.co.stop svg text{font-family:'Onest',sans-serif;font-weight:900}
+.co.bubble .tx,.co.stamp .tx{position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;white-space:nowrap}
+.co.bubble{background:#fff;border:7px solid #101510;border-radius:44px;box-shadow:0 12px 0 rgba(0,0,0,.28),0 22px 36px rgba(0,0,0,.38)}
+.co.bubble::after{content:'';position:absolute;left:46px;bottom:-26px;width:38px;height:38px;background:#fff;border-right:7px solid #101510;border-bottom:7px solid #101510;transform:rotate(45deg) skew(8deg,8deg)}
+.co.bubble .tx{font-family:'Onest',sans-serif;font-weight:900;color:#101510;letter-spacing:-.01em}
+.co.stamp{border:11px solid #FF3B4A;border-radius:16px;background:rgba(255,255,255,.93);box-shadow:0 12px 0 rgba(0,0,0,.28),0 22px 36px rgba(0,0,0,.38)}
+.co.stamp .tx{font-family:'Oswald',sans-serif;font-weight:700;color:#FF3B4A;letter-spacing:.05em}
+
+/* ---------- stock cutaway cards ---------- */
+.card{position:absolute;border-radius:60px;overflow:hidden;background:#000;box-shadow:0 40px 90px rgba(0,0,0,.55),0 0 0 6px rgba(255,255,255,.92);opacity:0;visibility:hidden}
+.card video{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover}
 
 /* ---------- transitions ---------- */
 #flash{position:absolute;left:0;top:0;width:1080px;height:1920px;background:#fff;opacity:0;visibility:hidden}

@@ -7,17 +7,15 @@ import json, re, subprocess, sys, tempfile
 from pathlib import Path
 import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build2 import STK, TRANS, CUTAWAYS, HOOK_T0, HOOK_T1
+from build2 import INSERTS, CALLOUTS, HOOK, TRANS, HOOK_T0, HOOK_T1
 
 src, assets, A, B, out = sys.argv[1], Path(sys.argv[2]), float(sys.argv[3]), float(sys.argv[4]), sys.argv[5]
 DUR = B - A
 SR = 48000
 MUSIC_UNDER = 11.0   # dB under the voice (RMS, speech frames)
-BOOST = 5.0          # dB raise in hook / transitions  -> about 6 dB under
+BOOST = 6.0          # dB raise in hook / transitions  -> about 6 dB under
 SFX_UNDER = 10.0     # dB under the voice peak
-TMAP = {'sweep': 'whoosh_swish_light', 'flare': 'shimmer_up'}
-SMAP = {'stopwatch': 'click_soft_2', 'magnify': 'pop_bubble', 'one': 'ping_notify', 'question': 'pop_1', 'bell': 'ding_chime',
-        'price': 'coin', 'calendar': 'click_soft_1', 'clock': 'pop_bubble', 'check': 'ding_glass'}
+TMAP = {'sweep': 'whoosh_swish_light', 'flare': 'shimmer_up', 'push': 'whoosh_short'}
 EXTRA = {'boom_soft': -2, 'boom_low': -2, 'coin': -2, 'ding_chime': -2, 'ding_glass': -2, 'shimmer_up': -2, 'horse_neigh': 2}
 FR = 0.1  # analysis frame, s
 
@@ -69,37 +67,52 @@ while i < nf:
         i += 1
 gap = g2
 
-# ---- events (range-local seconds) ----
+# ---- events (range-local seconds): (t, sample, dB-vs-voice-peak override or None) ----
 ev = []
-if A <= HOOK_T0: ev.append((HOOK_T0 + 0.05, 'boom_soft'))
+for h, nm in zip(HOOK, ('hit_1', 'hit_2', 'hit_3')):
+    if A <= HOOK_T0: ev.append((h['t'], nm, -SFX_UNDER + 2))          # rising-pitch impacts, ~8 dB under the voice peak
 cut_in_names = ['whoosh_medium2', 'whoosh_long', 'whoosh_medium']   # rotate
 ci = 0
+card_t = {c['n']: c['t'] for c in INSERTS if c['kind'] == 'card'}
 for t in TRANS:
     if t.get('cut'):
-        is_in = abs(t['t'] - next(c['t'] for c in CUTAWAYS if c['n'] == t['cut'])) < 1e-6
-        if is_in:
-            ev.append((t['t'] - 0.2, cut_in_names[ci % 3])); ci += 1
+        if abs(t['t'] - card_t[t['cut']]) < 1e-6:
+            ev.append((t['t'] - 0.2, cut_in_names[ci % 3], None)); ci += 1
         else:
-            ev.append((t['t'] - 0.2, 'whoosh_short'))
+            ev.append((t['t'] - 0.2, 'whoosh_short', None))
     else:
-        ev.append((t['t'] - 0.22, TMAP[t['type']]))
-for c in CUTAWAYS: ev.append((c['sfx_t'], c['sfx']))
-for s in STK: ev.append((s['t'] + 0.02, SMAP[s['type']]))
-ev = sorted((t - A, f) for t, f in ev if A - 0.3 <= t <= B)
-ev = [(t, f) for t, f in ev if t >= 0]
+        ev.append((t['t'] - 0.22, TMAP[t['type']], None))
+for c in INSERTS:
+    for (st, nm, ov) in c['sfx']: ev.append((st, nm, ov))
+for c in CALLOUTS:
+    for (st, nm, ov) in c['sfx']: ev.append((st, nm, ov))
+ev = sorted((t - A, f, ov) for t, f, ov in ev if A - 0.3 <= t <= B)
+ev = [(t, f, ov) for t, f, ov in ev if t >= 0]
 ALT = {'pop_1': 'click_soft_1', 'pop_bubble': 'click_soft_2', 'click_soft_1': 'pop_1', 'click_soft_2': 'pop_bubble', 'ding_chime': 'ding_glass',
        'whoosh_short': 'whoosh_swish_light', 'whoosh_medium': 'whoosh_medium2', 'whoosh_medium2': 'whoosh_long', 'whoosh_long': 'whoosh_medium'}
 for i in range(1, len(ev)):
-    if ev[i][1] == ev[i - 1][1]: ev[i] = (ev[i][0], ALT.get(ev[i][1], ev[i][1]))
+    if ev[i][1] == ev[i - 1][1] and not ev[i][1].startswith(('hit_', 'boom')): ev[i] = (ev[i][0], ALT.get(ev[i][1], ev[i][1]), ev[i][2])
 
 # ---- music, calibrated ----
 mfile = next((assets / 'music').glob('music_*.*'))
 mraw = load(mfile)
-music = fit(np.vstack([mraw] * (int(np.ceil(n / len(mraw))) + 1)), n)
+BAR = int(240 / 140 * SR)             # 1 bar at 140 BPM: crossfading exactly one bar keeps the beat grid aligned
+def loop_xfade(x, need):
+    out = x.copy(); seams = []
+    while len(out) < need + SR:
+        ov = BAR
+        fo_, fi_ = np.cos(np.linspace(0, np.pi / 2, ov))[:, None], np.sin(np.linspace(0, np.pi / 2, ov))[:, None]
+        seams.append(len(out) - ov)
+        out = np.vstack([out[:-ov], out[-ov:] * fo_ + x[:ov] * fi_, x[ov:]])
+    return out, seams
+music, seams = loop_xfade(mraw, n)
+music = fit(music, n)
 fi, fo = int(0.4 * SR), int(2.5 * SR)
 env = np.ones(n); env[:fi] = np.linspace(0, 1, fi); env[-fo:] = np.linspace(1, 0, fo)
 music = music * env[:, None]
 boost_win = [(0.0, HOOK_T1 - A + 0.2)] if A <= HOOK_T0 else []
+for c in INSERTS:
+    if c['kind'] == 'stop' and A - 0.5 < c['t'] < B + 0.5: boost_win.append((c['t'] - A - 0.3, c['t'] - A + 0.6))
 hook_end = HOOK_T1 - A + 0.2
 for t in TRANS:
     if A - 0.5 < t['t'] < B + 0.5: boost_win.append((t['t'] - A - 0.45, t['t'] - A + 0.45))
@@ -116,9 +129,9 @@ music = music * (10 ** (gain_db / 20))[:, None]
 
 # ---- sfx ----
 sfx = np.zeros((n, 2)); rows = []
-for t, f in ev:
+for t, f, ov in ev:
     x = load(assets / 'sfx' / f'{f}.wav')
-    tgt = vpk - SFX_UNDER + EXTRA.get(f, 0)
+    tgt = vpk + (ov if ov is not None else -SFX_UNDER + EXTRA.get(f, 0))
     x = x * (10 ** (tgt / 20) / np.abs(x).max())
     s0 = int(t * SR)
     seg = x[:max(0, n - s0)]
@@ -153,4 +166,10 @@ print(f'music in TRANSITIONS: {avg(mfin, bt) - avg(vf, bt):+.1f} dB vs voice RMS
 print(f'music in PAUSES (voice >=20 dB under speech level): RMS {avg(mfin, gap) + norm_db:.1f} dBFS absolute; voice floor there {avg(vf, gap) + norm_db:.1f} dBFS [{int(gap.sum())} frames = {gap.sum() * FR:.1f} s]')
 print(f'sfx: {len(rows)} cues scheduled, {onsets} audible onsets detected (frame power above voice-peak-38 dB); peaks {min(r[2] for r in rows):.1f}..{max(r[2] for r in rows):.1f} dB vs voice peak (target -8..-12)')
 print('sfx table (t, sample, dB vs voice peak):', rows)
+if seams:
+    for sm in seams:
+        if sm < n - SR:
+            w = int(0.5 * SR); pre_, post_ = music[max(0, sm - w):sm], music[sm + BAR:sm + BAR + w]
+            if len(pre_) and len(post_):
+                print(f'music loop seam at {sm / SR:.1f}s (1-bar crossfade): RMS before {db((pre_ ** 2).mean()):.1f} dB, after {db((post_ ** 2).mean()):.1f} dB, difference {abs(db((pre_ ** 2).mean()) - db((post_ ** 2).mean())):.1f} dB')
 print(f'final mix: integrated {fI} LUFS, true peak {fTP} dBTP')

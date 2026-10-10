@@ -5,7 +5,7 @@ falls back to the Pexels API with the PEXELS_API_KEY env var if the public link 
 import json, os, subprocess, sys, urllib.request
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build2 import CUTAWAYS, CARD
+from build2 import INSERTS, CARDS
 
 out = Path(sys.argv[1]); out.mkdir(parents=True, exist_ok=True)
 cache = Path(sys.argv[2]) if len(sys.argv) > 2 else out / '_cache'; cache.mkdir(parents=True, exist_ok=True)
@@ -26,7 +26,7 @@ def ok(p):
     return r.returncode == 0 and r.stdout.strip().isdigit()
 
 
-for c in CUTAWAYS:
+for c in [x for x in INSERTS if x['kind'] == 'card']:
     src = cache / f"{c['pexels']}.mp4"
     if not (src.exists() and ok(src)):
         try:
@@ -43,7 +43,7 @@ for c in CUTAWAYS:
             get(files[0]['link'], src)
     assert ok(src), f"bad file for {c['pexels']}"
     dur = round(c['e'] - c['t'] + 0.4, 3)   # a little tail so the video never freezes before the card leaves
-    W, H = CARD['w'], CARD['h']
+    W, H = CARDS[c['shape']]['w'], CARDS[c['shape']]['h']
     subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-ss', str(c['ss']), '-t', str(dur), '-i', str(src),
                     '-vf', f'scale={W}:{H}:force_original_aspect_ratio=increase:flags=lanczos,crop={W}:{H},fps=30,eq=saturation=1.05', '-an', '-c:v', 'libx264', '-crf', '16', '-preset', 'fast', '-pix_fmt', 'yuv420p',
                     str(out / f"cut{c['n']}.mp4")], check=True)
