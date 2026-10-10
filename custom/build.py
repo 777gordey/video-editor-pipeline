@@ -52,7 +52,7 @@ def main():
     ap.add_argument('--out', required=True)
     ap.add_argument('--layers')
     ap.add_argument('--plain', action='store_true')
-    ap.add_argument('--words', default=str(ROOT / 'out' / 'transcript_medium.json'))
+    ap.add_argument('--words', default=str(HERE / 'words.json'))
     ap.add_argument('--gsap', default=str(HERE / 'gsap.min.js'))
     ap.add_argument('--fonts', default=str(HERE / 'fonts'))
     a = ap.parse_args()
