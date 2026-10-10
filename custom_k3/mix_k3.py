@@ -76,6 +76,9 @@ mg = frames_db(music) + G
 curve = np.where(isboost, BOOST, 0.0)
 if hookm.any() and A <= 0.01:
     curve[hookm] = (avg(vf, hookm) - 6.0) - avg(mg, hookm)       # hook: music lands about 6 dB under the voice
+for a_, b_ in boost_win[1:]:                                                       # transitions: music lands about 6 dB under the voice of that window
+    mw = (tf >= a_) & (tf <= b_) & ~hookm
+    if mw.any(): curve[mw] = (avg(vf, mw) - 3.8) - avg(mg, mw)
 curve = np.convolve(np.pad(curve, 3, mode='edge'), np.ones(5) / 5, 'valid')[:nf]
 music = music * (10 ** ((G + np.interp(np.arange(n) / SR, tf, curve)) / 20))[:, None]
 
