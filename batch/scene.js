@@ -253,6 +253,26 @@ P.cards.forEach(c => {
       tl.set(ec, { autoAlpha: 0 }, t0 + 0.52);
     }
   }
+  if (WC.type === 'split_black') {
+    const b = $('blk2');
+    const tx = mk('sb-text', `top:960px;font-size:${WC.size || 190}px`, null, esc(WC.text));
+    gs.set(tx, { xPercent: -50, yPercent: -50, autoAlpha: 0 });
+    tl.set(b, { opacity: 1 }, T(t)); tl.set(b, { opacity: 0 }, T(e));
+    tl.set(tx, { autoAlpha: 1 }, T(t)); tl.set(tx, { autoAlpha: 0 }, T(e));
+    tl.fromTo(tx, { scale: 1.35 }, { scale: 1, duration: 0.14, ease: 'power4.out', immediateRender: false }, T(t));
+    tl.to(tx, { scale: 1.05, duration: e - t - 0.14, ease: 'none' }, T(t) + 0.14);
+    flash(e, 0.5);
+  }
+  if (WC.type === 'timer') {
+    const el = mk('timer', 'top:1300px', null, `<div class="tm-lab">${esc(WC.text || '')}</div><div class="tm-val">00:00</div>`);
+    gs.set(el, { xPercent: -50, autoAlpha: 0 });
+    tl.set(el, { autoAlpha: 1 }, T(t)); tl.set(el, { autoAlpha: 0 }, T(e));
+    tl.fromTo(el, { scale: 1.4 }, { scale: 1, duration: 0.14, ease: 'power4.out', immediateRender: false }, T(t));
+    const o = { v: WC.value_from }, val = el.querySelector('.tm-val'), a = WC.value_from, b2 = WC.value_to;
+    const fmt = v => { const s = Math.max(0, Math.round(v)); return pad(Math.floor(s / 60)) + ':' + pad(s % 60); };
+    val.textContent = fmt(a);
+    tl.to(o, { v: b2, duration: Math.max(0.3, e - t - 0.2), ease: 'none', onUpdate: () => { val.textContent = fmt(o.v); } }, T(t) + 0.1);
+  }
   if (WC.type === 'silence_gag') flash(t, 0.35);
   if (WC.type === 'sound_gag') flash(t, 0.18);
 })();

@@ -44,6 +44,10 @@ def init():
       status TEXT, attempts INTEGER DEFAULT 0, created REAL, started REAL, finished REAL, run_id TEXT, run_url TEXT, error TEXT, result TEXT, wildcard TEXT);
     CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
     """)
+    cols = {r[1] for r in c.execute('PRAGMA table_info(jobs)')}
+    for col in ('plan_run', 'plan_b64', 'prior'):
+        if col not in cols:
+            c.execute(f'ALTER TABLE jobs ADD COLUMN {col} TEXT')
     c.close()
 
 
@@ -70,7 +74,7 @@ def ingest(b):
         c.execute('INSERT INTO jobs(id,batch_id,clip_no,chat_id,msg_id,media_group_id,file_id,file_unique_id,video_url,duration,caption,preset,seed,status,created) '
                   'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
                   (jid, bt['id'], n, chat, b.get('msg_id'), b.get('media_group_id'), b.get('file_id'), b['file_unique_id'], b.get('video_url'),
-                   b.get('duration'), (b.get('caption') or '')[:1500], preset, str(uuid.uuid4().int % 100000), 'queued', now))
+                   b.get('duration'), (b.get('caption') or '')[:1500], preset, str(uuid.uuid4().int % 100000), 'held' if b.get('hold') else 'queued', now))
         c.execute('UPDATE batches SET count=?, last_arrival=?, last_preset=? WHERE id=?', (n, now, preset, bt['id']))
         return {'dup': False, 'job': row(c.execute('SELECT * FROM jobs WHERE id=?', (jid,)).fetchone()), 'total': n}
     finally:
@@ -97,6 +101,15 @@ def claim(limit):
             j = row(c.execute('SELECT * FROM jobs WHERE id=?', (r['id'],)).fetchone())
             recent = [x['wildcard'] for x in c.execute("SELECT wildcard FROM jobs WHERE batch_id=? AND wildcard IS NOT NULL AND wildcard<>'' ORDER BY clip_no DESC LIMIT 4", (r['batch_id'],))]
             j['recent_wildcards'] = recent
+            pcs = []
+            for x in c.execute("SELECT result FROM jobs WHERE batch_id=? AND result IS NOT NULL ORDER BY clip_no DESC LIMIT 6", (r['batch_id'],)):
+                try:
+                    rr = json.loads(x['result'])
+                    if rr.get('concept'):
+                        pcs.append(f"{rr['concept']} ({rr.get('wildcard')}; хук-структура {len(rr.get('hook') or [])} стр.; вставки {','.join(rr.get('ins_kinds') or [])})")
+                except ValueError:
+                    pass
+            j['prior'] = ';'.join(pcs)[:900]
             j['total'] = total_of(c, r['batch_id'])
             out.append(j)
         return {'jobs': out, 'running': running + len(out)}
@@ -141,6 +154,29 @@ def finalize(b):
         c.close()
 
 
+def plan_set(b):
+    c = db()
+    try:
+        c.execute('UPDATE jobs SET plan_run=COALESCE(?,plan_run), plan_b64=COALESCE(?,plan_b64) WHERE id=?', (b.get('plan_run'), b.get('plan_b64'), b['job_id']))
+        return {'ok': True}
+    finally:
+        c.close()
+
+
+def release(b):
+    """held -> queued (all, or the listed ids), in clip order"""
+    c = db()
+    try:
+        ids = b.get('ids')
+        if ids:
+            cur = c.execute(f"UPDATE jobs SET status='queued' WHERE status='held' AND id IN ({','.join('?' * len(ids))})", ids)
+        else:
+            cur = c.execute("UPDATE jobs SET status='queued' WHERE status='held'")
+        return {'released': cur.rowcount}
+    finally:
+        c.close()
+
+
 def update(b):
     c = db()
     try:
@@ -156,7 +192,7 @@ def listing(status=None):
         q = 'SELECT * FROM jobs' + (' WHERE status=?' if status else '') + ' ORDER BY created, clip_no'
         rows = [row(r) for r in c.execute(q, (status,) if status else ())]
         for r in rows:
-            r.pop('result', None)
+            r.pop('plan_b64', None)
             r['total'] = total_of(c, r['batch_id'])
         return {'jobs': rows}
     finally:
@@ -226,6 +262,10 @@ class H(BaseHTTPRequestHandler):
                     return self._send(200, claim(int(b.get('limit', 4))))
                 if self.path == '/finish':
                     return self._send(200, finish(b))
+                if self.path == '/plan_set':
+                    return self._send(200, plan_set(b))
+                if self.path == '/release':
+                    return self._send(200, release(b))
                 if self.path == '/finalize':
                     return self._send(200, finalize(b))
                 if self.path == '/update':

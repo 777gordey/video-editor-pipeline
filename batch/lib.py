@@ -140,17 +140,24 @@ def build_caps(W, M, pr, keys, emo, nums, hook_t1, big_idx=None):
 
 
 # ------------------------------------------------------------------ camera
-def zoom_keys(dur, cuts, pr, seed):
+CAMERA = {'calm': ((1.03, 1.12), (4.5, 7.5)), 'normal': (None, None), 'aggressive': ((1.08, 1.22), (2.0, 3.6)), 'locked': ((1.0, 1.06), (6.0, 9.0))}
+
+
+def zoom_keys(dur, cuts, pr, seed, camera='normal'):
     """slow push-in, then a hard step to a new framing (two keys 0.01 s apart = a jump). Real cuts of the footage reset to 1.00."""
     rng = random.Random(seed)
     lo, hi = pr['zoom_range']
+    zr, ze = CAMERA.get(camera, (None, None))
+    every = ze or pr['zoom_every']
+    if zr:
+        lo, hi = zr
     ev = sorted(set([0.0] + [c for c in cuts if 0 < c < dur] + [dur]))
     keys = [(0.0, 1.0)]
     t = 0.0
     z = 1.0
     cutset = set(round(c, 2) for c in cuts)
     while t < dur - 0.2:
-        step = rng.uniform(*pr['zoom_every'])
+        step = rng.uniform(*every)
         nxt = t + step
         hit_cut = [c for c in cuts if t + 0.3 < c < nxt + 0.6]
         if hit_cut:
@@ -217,8 +224,39 @@ def cam_path(face, ZK, cuts, dur, step=0.1, zmax=1.22, jumps=()):
             for a, b, jz in jumps:
                 if a <= tt <= b:
                     z = jz
+            for r in face:                                  # the head is never cropped: cap the zoom by the nearest detected head top
+                if r['f'] and abs(r['t'] - tt) <= 0.25:
+                    ht = r['f'][1] - 0.8 * r['f'][2] * 0.5625
+                    if ht < ay - 0.01:
+                        z = min(z, (ay - 0.02) / (ay - ht))
             wx, wy = cx * (1 - 1 / z), ay * (1 - 1 / z)
             out.append([round(tt, 3), round(z, 4), round(-wx * 1080 * z, 1), round(-wy * 1920 * z, 1)])
             tt += step
         out.append([round(t1 - 0.001, 3), out[-1][1], out[-1][2], out[-1][3]])
     return sorted(out, key=lambda r: r[0])
+
+
+def camera_gate(cam, face):
+    """max zoom and the lowest projected head top over the whole clip (y' = ay + z*(y-ay), the same transform the page applies)"""
+    zmax = max(r[1] for r in cam)
+    worst = 1.0
+    for r in face:
+        if not r['f']:
+            continue
+        k = min(range(len(cam)), key=lambda i: abs(cam[i][0] - r['t']))
+        z, ty = cam[k][1], cam[k][3]
+        ht = r['f'][1] - 0.8 * r['f'][2] * 0.5625
+        y_new = z * ht + ty / 1920.0                        # translate is in px of the scaled layer: y' = z*y + ty/1920
+        worst = min(worst, y_new)
+    return round(zmax, 3), round(worst, 3)
+
+
+def hook_lines(plan):
+    """effective hook lines for the chosen layout (stack: up to 3 | single: one giant line | split: 2)"""
+    L = [x for x in plan['hook']['lines'] if x][:3]
+    lay = (plan.get('style') or {}).get('hook_layout', 'stack')
+    if lay == 'single':
+        return [" ".join(L[:2])[:30]] if L else []
+    if lay == 'split':
+        return L[:2]
+    return L

@@ -34,7 +34,7 @@ PRESETS = {
         stock_grade="eq=saturation=0.40:contrast=1.22:brightness=-0.05:gamma=0.92,colorbalance=bs=0.05:bm=0.03",
         music=["dark_pulse.ogg"], hook_sfx=["impact_deep", "metal_hit", "boom_low"], final_sfx="impact_deep",
         kinds=["punch", "stock", "wave", "stat", "stamp"], card_band="low",
-        sfx_for={"punch": [("metal_hit", None)], "stock": [("riser", -13), ("impact_deep", None), ("whip", -13)],
+        sfx_for={"punch": [("metal_hit", None)], "stock": [("riser", -12), ("impact_deep", None), ("whip", -12)],
                  "wave": [("sub_drop", None)], "stat": [("tick_low", -12), ("impact_deep", None)], "stamp": [("metal_hit", None)]},
         hook_anim="hard", zoom_range=(1.06, 1.22), zoom_every=(3.0, 6.0), hit_amp=(11, 15, 13), hit_punch=(0.03, 0.05, 0.04),
     ),
@@ -81,6 +81,15 @@ SFX_VOCAB = {
     "ping_notify": "notification ping", "hit_1": "short hit", "hit_2": "hit", "hit_3": "heavy hit",
 }
 
+MUSIC_ALL = ["dark_pulse.ogg", "lofi_chill.ogg", "lofi_hiphop.ogg", "dance_field.ogg"]
+MUSIC_HELP = {"dark_pulse.ogg": "dark minimal pulse (serious, tense, provocative)", "lofi_chill.ogg": "calm lo-fi (educational, reflective, soft-spoken)",
+              "lofi_hiphop.ogg": "lo-fi hip-hop groove (relaxed confidence, humour, storytelling)", "dance_field.ogg": "driving upbeat pulse (urgent, energetic, results)"}
+STYLE_HELP = {
+    "camera": "calm (slow 1.0-1.12 pushes) | normal (1.04-1.22) | aggressive (hard 1.06-1.22 steps every 2-3 s) | locked (almost still, 1.0-1.06)",
+    "hook_layout": "stack (3 stacked lines) | single (ONE giant line, 2-4 words) | split (2 lines, the second is the answer)",
+    "stock_transition": "whip | zoom | flash   (how full-frame cutaways enter/leave)",
+}
+
 WILDCARDS = {
     "blackout_open": "OPENING: first ~0.5 s is pure black with only a sub-bass drop, then the picture and the hook slam in (needs at_word = first word)",
     "silence_gag": "SOUND: music and effects cut to dead silence ~0.7 s before the target word, then a deep impact lands on it",
@@ -89,7 +98,9 @@ WILDCARDS = {
     "echo_caption": "TEXT/SOUND: the target word is echoed three times, trailing and fading, with three ticks (a stutter)",
     "sound_gag": "SOUND-DESIGN GAG: one real-world sound (see sample list) placed exactly on the target word, e.g. phone ring on 'звонок'",
     "metaphor_stock": "VISUAL METAPHOR: a 1.3 s full-frame stock cutaway searched by `query` (e.g. 'chess pieces', 'anvil sparks', 'stopwatch')",
-    "punch_cut": "FRAMING: instant jump-zoom to ~1.35x on the target word for ~0.9 s, with a whip, then back",
+    "timer": "VISUAL METAPHOR: a big mono clock/counter counts value_from -> value_to (integers, seconds) over the phrase first..last (deadline, countdown, time pressure); label = what is counted",
+    "split_black": "PATTERN BREAK: for ~0.9 s the room cuts to pure black and the key phrase (2-4 words, yours from the speech) stands alone in giant type while the voice continues, then the room slams back",
+    "punch_cut": "FRAMING: instant jump-zoom to 1.22x on the target word for ~0.9 s, with a whip, then back",
 }
 
 BATCH_ORDER_RULE = "dark on clip numbers 1,6,11,16,...; other clips alternate proof/slab; never two equal presets in a row"

@@ -15,7 +15,10 @@ def stock_cards(plan):
     """stock cutaways: planned inserts + the metaphor_stock wildcard, all numbered the same way"""
     cards = [c for c in plan['inserts'] if c['kind'] == 'stock']
     wc = plan['wildcard']
-    out = [dict(c, **{'in': 'whip' if c['n'] % 2 == 0 else 'cut', 'out': 'flash' if c['n'] % 2 else 'cut'}) for c in cards]
+    tr = (plan.get('style') or {}).get('stock_transition', 'zoom')
+    ins_ = {'whip': lambda n: 'whip', 'zoom': lambda n: 'cut', 'flash': lambda n: 'cut'}[tr]
+    outs_ = {'whip': lambda n: 'cut', 'zoom': lambda n: 'flash' if n % 2 else 'cut', 'flash': lambda n: 'flash'}[tr]
+    out = [dict(c, **{'in': ins_(c['n']), 'out': outs_(c['n'])}) for c in cards]
     if wc['type'] == 'metaphor_stock':
         out.append({'kind': 'stock', 'n': 90, 't': wc['t'], 'e': wc['e'], 'query': wc['query'], 'in': 'cut', 'out': 'flash', 'wild': True})
     return out
@@ -34,11 +37,11 @@ def scene_cards(plan):
 
 
 def hits_for(plan, pr, shift):
-    h = [[round(t + shift, 2), pr['hit_amp'][min(i, 2)], pr['hit_punch'][min(i, 2)]] for i, t in enumerate(HOOK_POPS[:len(plan['hook']['lines'])])]
+    h = [[round(t + shift, 2), pr['hit_amp'][min(i, 2)], pr['hit_punch'][min(i, 2)]] for i, t in enumerate(HOOK_POPS[:len(lib.hook_lines(plan))])]
     for c in plan['inserts']:
         h.append([round(c['t'] + 0.02, 2), 9 if c['kind'] != 'wave' else 7, 0.02])
     wc = plan['wildcard']
-    if wc['type'] in ('silence_gag', 'sound_gag', 'negative_flash', 'punch_cut', 'echo_caption'):
+    if wc['type'] in ('silence_gag', 'sound_gag', 'negative_flash', 'punch_cut', 'echo_caption', 'split_black', 'timer'):
         h.append([round(wc['t'] + 0.02, 2), 13 if wc['type'] != 'sound_gag' else 8, 0.04])
     if plan.get('big') is not None:
         h.append([round(plan['_words'][plan['big']]['s'] + 0.04, 2), 10, 0.03])
@@ -81,18 +84,20 @@ def main():
     words = lib.clean_words(an['words'], plan.get('fixes'))
     keys, emo, nums = set(plan['keys']), set(plan['emo']), set(plan['nums'])
     caps = lib.build_caps(words, M, pr, keys, emo, nums, hook_t1, plan.get('big'))
-    ZK = lib.zoom_keys(an['dur'], an['cuts'], pr, plan['seed'])
-    jumps = [(wc['t'], wc['e'], 1.35)] if wc['type'] == 'punch_cut' else []
+    ZK = lib.zoom_keys(an['dur'], an['cuts'], pr, plan['seed'], (plan.get('style') or {}).get('camera', 'normal'))
+    jumps = [(wc['t'], wc['e'], 1.22)] if wc['type'] == 'punch_cut' else []
     cam = lib.cam_path(an['face'], ZK, an['cuts'], an['dur'], jumps=jumps)
 
     hook = None
     if A <= hook_t0 + 0.01:
         lines = []
-        for i, txt in enumerate(plan['hook']['lines'][:3]):
-            role = pr['hook_font_role'][i]
+        single = (plan.get('style') or {}).get('hook_layout') == 'single'
+        for i, txt in enumerate(lib.hook_lines(plan)):
+            j = 1 if single else i                         # single layout: the one line wears the big face (h2) in the middle slot
+            role = pr['hook_font_role'][j]
             em = M.em(txt, role) + 0.05
-            lines.append({'text': txt, 'cls': f'h{i + 1}', 't': round(HOOK_POPS[i] + shift, 2), 'y': pr['hook_y'][i],
-                          'size': int(min(pr['hook_size'][i], 940 / em))})
+            lines.append({'text': txt, 'cls': f'h{j + 1}', 't': round(HOOK_POPS[i] + shift, 2), 'y': pr['hook_y'][j] if not single else 1440,
+                          'size': int(min(pr['hook_size'][j] * (1.5 if single else 1.0), 940 / em))})
         hook = {'lines': lines, 't0': hook_t0, 'exit': hook_exit, 't1': hook_t1}
     cards = [dict(c) for c in scene_cards(plan) if c['e'] > A and c['t'] < B]
     for c in cards:                                   # giant words must fit the 1080 px frame
@@ -104,6 +109,9 @@ def main():
     if wc['type'] == 'echo_caption' and not wcv.get('text'):
         wcv['text'] = words and next((w['t'] for w in words if w['idx'] == wc['at']), '') or ''
     wcv['text'] = (wcv.get('text') or '').upper()
+    if wc['type'] == 'split_black' and wcv['text']:
+        longest = max(wcv['text'].split(), key=len)
+        wcv['size'] = int(min(190, 860 / (M.em(longest, 'h2') + 0.05)))
     pagePlan = {'off': A, 'dur': dur, 'cam': cam, 'caps': [c for c in caps if c['e'] > A and c['s'] < B], 'cards': cards,
                 'hits': [h for h in hits_for(plan, pr, shift) if A - 0.01 <= h[0] <= B], 'hook': hook, 'capY': pr['cap_y'],
                 'band': pr['card_band'], 'hookAnim': pr['hook_anim'], 'capMode': 'wordwise' if pr['id'] == 'dark' else 'group',
@@ -136,6 +144,7 @@ def main():
     <div id="stocks" class="layer">{stockvids}</div></div>
   <div id="over" class="layer">{lb}</div>
   <div id="blk"></div>
+  <div id="blk2"></div>
 </div>
 <script>window.PLAN = {json.dumps(pagePlan, ensure_ascii=False)};</script>
 <script>

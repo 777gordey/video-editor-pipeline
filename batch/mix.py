@@ -11,6 +11,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from presets import PRESETS
 from plan import HOOK_POPS
+import lib
 
 SR = 48000
 MUSIC_UNDER, BOOST, SFX_UNDER, FR = 11.0, 5.0, 10.0, 0.1
@@ -81,7 +82,7 @@ def events(plan, an, pr):
     wc = plan['wildcard']
     shift = 0.45 if wc['type'] == 'blackout_open' else 0.0
     ev = []
-    for i, line in enumerate(plan['hook']['lines'][:3]):
+    for i, line in enumerate(lib.hook_lines(plan)):
         ev.append((HOOK_POPS[i] + shift, pr['hook_sfx'][i], None))
     for c in plan['inserts']:
         sf = pr['sfx_for'].get(c['kind'], [])
@@ -105,6 +106,10 @@ def events(plan, an, pr):
         ev += [(t, wc.get('sample') or 'impact_deep', -9)]
     elif ty == 'metaphor_stock':
         ev += [(t - 1.0, 'riser', -13), (t, 'impact_deep', None), (e - 0.05, 'whip', -13)]
+    elif ty == 'split_black':
+        ev += [(t - 0.02, 'sub_drop', None), (t + 0.9, 'impact_deep', None)]
+    elif ty == 'timer':
+        ev += [(t, 'card_in', None)] + [(t + 0.5 + k, 'tick_a', -11) for k in range(int(max(1, e - t - 0.5)))] + [(e - 0.1, 'ding_chime', -11)]
     elif ty == 'punch_cut':
         ev += [(t, 'whip', -9), (e, 'whip', -13)]
     if plan.get('big') is not None:
@@ -145,7 +150,7 @@ def main():
 
     # ---- music ----
     rng = random.Random(plan['seed'])
-    mname = rng.choice(pr['music'])
+    mname = (plan.get('style') or {}).get('music') or rng.choice(pr['music'])
     music = loop_music(load(assets / 'music' / mname), n)
     fi, fo = int(0.4 * SR), int(2.5 * SR)
     env = np.ones(n)
@@ -192,7 +197,7 @@ def main():
         x = load(assets / 'sfx' / f'{f}.wav')[: int(1.6 * SR)]
         k = min(len(x), int(0.08 * SR))
         x[-k:] *= np.linspace(1, 0, k)[:, None]
-        tgt = vpk + (ov if ov is not None else -SFX_UNDER)
+        tgt = vpk + (min(-8.0, max(-12.0, ov)) if ov is not None else -SFX_UNDER)
         x = x * (10 ** (tgt / 20) / max(1e-9, np.abs(x).max()))
         s0 = int(t * SR)
         seg = x[:max(0, n - s0)]

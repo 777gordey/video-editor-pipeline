@@ -86,7 +86,7 @@ else if (m.video_note) { v = m.video_note; kind = 'video_note'; }
 else if (m.document && ((m.document.mime_type || '').startsWith('video/') || /\.(mp4|mov|m4v|mkv|webm|avi|3gp)$/i.test(m.document.file_name || ''))) { v = m.document; kind = 'document'; }
 if (!v) return [];
 return [{ json: { chat_id: m.chat.id, msg_id: m.message_id, media_group_id: m.media_group_id || '', kind, file_id: v.file_id,
-  file_unique_id: v.file_unique_id, duration: v.duration || 0, caption: String(m.caption || '').slice(0, 1500), test_url: m.test_video_url || '' } }];
+  file_unique_id: v.file_unique_id, duration: v.duration || 0, caption: String(m.caption || '').slice(0, 1500), test_url: m.test_video_url || '', hold: !!m.test_hold } }];
 """
     nodes, conns = [], {}
     if test:
@@ -104,7 +104,7 @@ return [{ json: { chat_id: m.chat.id, msg_id: m.message_id, media_group_id: m.me
 const e = $('Extract media').first().json;
 let url = e.test_url;
 if (!url) { const fp = ($json.result && $json.result.file_path) || ''; url = 'https://gordey1-bot.duckdns.org/vf/__VF_SECRET__/' + fp.split('/').pop(); }
-return [{ json: { chat_id: e.chat_id, msg_id: e.msg_id, media_group_id: e.media_group_id, file_id: e.file_id, file_unique_id: e.file_unique_id, duration: e.duration, caption: e.caption, video_url: url } }];
+return [{ json: { chat_id: e.chat_id, msg_id: e.msg_id, media_group_id: e.media_group_id, file_id: e.file_id, file_unique_id: e.file_unique_id, duration: e.duration, caption: e.caption, video_url: url, hold: e.hold } }];
 """, [1100, 80]),
         qpost("Ingest", "/ingest", "={{ JSON.stringify($json) }}", [1320, 80]),
         if_bool("Duplicate?", "={{ $json.dup }}", [1540, 80]),
@@ -127,7 +127,7 @@ def dispatcher():
             "method": "POST", "url": f"{GH}/actions/workflows/batch-edit.yml/dispatches", "authentication": "predefinedCredentialType", "nodeCredentialType": "githubApi",
             "sendHeaders": True, "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github+json"}]},
             "sendBody": True, "specifyBody": "json",
-            "jsonBody": "={{ JSON.stringify({ ref: 'batch-engine', inputs: { job_id: $json.id, video_url: $json.video_url, preset: $json.preset, clip_no: String($json.clip_no), seed: String($json.seed), recent: ($json.recent_wildcards || []).join(',') } }) }}",
+            "jsonBody": "={{ JSON.stringify({ ref: 'batch-engine', inputs: { job_id: $json.id, video_url: $json.video_url, preset: $json.preset, clip_no: String($json.clip_no), seed: String($json.seed), recent: ($json.recent_wildcards || []).join(','), prior: $json.prior || '', plan_run: $json.plan_run || '', plan_b64: $json.plan_b64 || '' } }) }}",
             "options": {"response": {"response": {"fullResponse": True, "neverError": True}}}}, [660, 0], cred="gh"),
         if_bool("Dispatch ok?", "={{ $json.statusCode < 300 }}", [880, 0]),
         qpost("Dispatch failed", "/finish", "={{ JSON.stringify({ job_id: $('Split jobs').item.json.id, ok: false, error: 'dispatch http ' + $json.statusCode }) }}", [1100, 120]),
@@ -162,7 +162,7 @@ let res = {};
 try { res = JSON.parse((await this.helpers.getBinaryDataBuffer(0, key['result.json'])).toString('utf8')); } catch (e) {}
 const NAMES = { dark: 'Dark Steel', proof: 'Proof Cards', slab: 'Hazard Slab' };
 const num = String(job.clip_no).padStart(2, '0');
-const cap = `Клип ${num} из ${job.total} · ${NAMES[res.preset || job.preset] || job.preset}` + (res.wildcard ? ` · фишка: ${res.wildcard}` : '');
+const cap = `Клип ${num} из ${job.total} · ${NAMES[res.preset || job.preset] || job.preset}` + (res.concept ? ` · ${res.concept}` : '');
 return [{ json: { caption: cap, result: res }, binary: { data: video } }];
 """
     nodes = [

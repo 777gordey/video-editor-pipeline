@@ -15,6 +15,22 @@ on:
       preset:
         description: "dark | proof | slab"
         required: true
+      plan_run:
+        description: "run id whose `plan` artifact (analysis + plan + stock) is reused instead of planning again"
+        required: false
+        default: ""
+      plan_b64:
+        description: "optional gzip+base64 plan.json that overrides the planned one (variety rewrite)"
+        required: false
+        default: ""
+      plan_only:
+        description: "true = analyze + plan only (no rendering)"
+        required: false
+        default: "false"
+      prior:
+        description: "concepts of the previous clips of the batch (';' list) the planner must not repeat"
+        required: false
+        default: ""
       clip_no:
         description: "arrival number in the batch (rotates the wildcard types)"
         required: false
@@ -82,18 +98,45 @@ jobs:
           test -s source.mp4
           ffprobe -v error -show_entries stream=codec_type,width,height:format=duration -of csv=p=0 source.mp4
       - name: Analyze (probe, words, cuts, face)
+        if: ${{ inputs.plan_run == '' }}
         run: python batch/analyze.py source.mp4 work --model "${{ inputs.whisper || 'large-v3' }}"
       - name: Plan (one headless Claude call) + stock cutaways
+        if: ${{ inputs.plan_run == '' }}
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           PLAN_MODEL: ${{ inputs.model || vars.PLAN_MODEL }}
         run: |
-          python3 -c "import json,sys;json.dump({'recent_wildcards':[x for x in sys.argv[1].split(',') if x]},open('work/payload.json','w'))" "${{ inputs.recent }}"
+          python3 -c "import json,sys;json.dump({'recent_wildcards':[x for x in sys.argv[1].split(',') if x],'prior_concepts':[x.strip() for x in sys.argv[2].split(';') if x.strip()]},open('work/payload.json','w'))" "${{ inputs.recent }}" "${{ inputs.prior }}"
           python batch/plan.py work/analysis.json --preset "${{ inputs.preset }}" --out work/plan.json --payload work/payload.json --seed "${{ inputs.seed }}" --clip-no "${{ inputs.clip_no }}"
           python batch/stock.py --plan work/plan.json --out work/stock
+      - name: Reuse the planned work (plan artifact)
+        if: ${{ inputs.plan_run != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PLAN_B64: ${{ inputs.plan_b64 }}
+        run: |
+          mkdir -p work
+          gh run download "${{ inputs.plan_run }}" -R "$GITHUB_REPOSITORY" -n plan -D plan_in
+          cp -r plan_in/* work/
+          ls -la work
+          if [ -n "$PLAN_B64" ]; then
+            python3 -c "import base64,gzip,os;open('work/plan.json','wb').write(gzip.decompress(base64.b64decode(os.environ['PLAN_B64'])))"
+            rm -rf work/stock && python batch/stock.py --plan work/plan.json --out work/stock
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: plan
+          path: |
+            work/analysis.json
+            work/plan.json
+            work/stock
+          retention-days: 2
+          if-no-files-found: error
       - name: Parts
         id: parts
+        if: ${{ inputs.plan_only != 'true' }}
         run: |
           python3 - <<'PY'
           import json, math, os
@@ -108,6 +151,7 @@ jobs:
           print(parts)
           PY
       - uses: actions/upload-artifact@v4
+        if: ${{ inputs.plan_only != 'true' }}
         with:
           name: work
           path: |
@@ -121,6 +165,7 @@ jobs:
 
   part:
     needs: analyze
+    if: ${{ inputs.plan_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
     strategy:
@@ -174,6 +219,7 @@ jobs:
 
   assemble:
     needs: [analyze, part]
+    if: ${{ inputs.plan_only != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -203,13 +249,16 @@ jobs:
             -vf "format=yuv420p" -c:v libx264 -preset medium -crf 18 -r 30 -c:a copy -movflags +faststart -t $D final.mp4
           ffprobe -v error -show_entries format=duration,size -of csv=p=0 final.mp4
           ffmpeg -y -loglevel error -i final.mp4 -vf "fps=1/3,scale=216:-1,tile=8x3" -frames:v 1 contact.jpg
+          python3 batch/gates.py in/work/plan.json in/work/analysis.json levels.json final.mp4 gates.json
           python3 - <<'PY'
           import json
           plan = json.load(open('in/work/plan.json')); an = json.load(open('in/work/analysis.json')); lv = json.load(open('levels.json'))
-          res = {'preset': plan['preset'], 'wildcard': plan['wildcard']['type'], 'wildcard_note': plan['wildcard'].get('note'), 'picked_idea': plan.get('picked_idea'),
-                 'ideas': [(i.get('type'), i.get('boldness')) for i in plan.get('ideas', [])], 'planner': plan.get('planner'), 'planner_meta': plan.get('planner_meta'),
+          res = {'preset': plan['preset'], 'wildcard': plan['wildcard']['type'], 'wildcard_note': plan['wildcard'].get('note'), 
+                 'planner': plan.get('planner'), 'planner_meta': plan.get('planner_meta'),
                  'inserts': [(i['kind'], i['t']) for i in plan['inserts']], 'summary': plan.get('summary'), 'notes': plan.get('notes'),
-                 'dur': an['dur'], 'analysis_timings': an.get('timings'), 'levels': lv}
+                 'dur': an['dur'], 'analysis_timings': an.get('timings'), 'levels': lv, 'gates': json.load(open('gates.json')),
+                 'concept': plan.get('concept_name'), 'concept_kind': plan.get('concept_kind'), 'concept_pitch': plan.get('concept_pitch'), 'tone': plan.get('tone'),
+                 'style': plan.get('style'), 'hook': plan['hook']['lines'], 'ins_kinds': [i['kind'] for i in plan['inserts']], 'music': lv.get('music_file')}
           json.dump(res, open('result.json', 'w'), ensure_ascii=False, indent=1)
           print(json.dumps(res, ensure_ascii=False)[:1500])
           PY
