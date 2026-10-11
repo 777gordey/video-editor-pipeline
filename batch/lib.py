@@ -256,7 +256,7 @@ def hook_lines(plan):
     L = [x for x in plan['hook']['lines'] if x][:3]
     lay = (plan.get('style') or {}).get('hook_layout', 'stack')
     if lay == 'single':
-        return [" ".join(L[:2])[:30]] if L else []
+        return L[:1]
     if lay == 'split':
         return L[:2]
     return L

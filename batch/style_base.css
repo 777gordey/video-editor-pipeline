@@ -47,5 +47,5 @@ body.band-low .uc{top:1223px}
 #blk2{position:absolute;left:0;top:0;width:1080px;height:1920px;background:#000;opacity:0;pointer-events:none}
 .sb-text{position:absolute;left:540px;width:960px;text-align:center;line-height:1.05;white-space:normal;opacity:0;visibility:hidden;color:var(--bone);font-family:var(--fnum);font-weight:900;text-transform:uppercase}
 .timer{position:absolute;left:540px;text-align:center;opacity:0;visibility:hidden;white-space:nowrap}
-.timer .tm-lab{font-family:var(--fmono);font-weight:800;font-size:34px;letter-spacing:.12em;color:var(--acc);text-transform:uppercase}
+.timer .tm-lab{font-family:var(--fmono);font-weight:800;font-size:46px;letter-spacing:.12em;color:var(--acc);text-transform:uppercase;-webkit-text-stroke:.1em var(--ink);paint-order:stroke fill}
 .timer .tm-val{font-family:var(--fnum);font-weight:800;font-size:200px;line-height:1.05;color:var(--bone);-webkit-text-stroke:.04em var(--ink);paint-order:stroke fill;text-shadow:0 .04em .18em rgba(0,0,0,.7)}

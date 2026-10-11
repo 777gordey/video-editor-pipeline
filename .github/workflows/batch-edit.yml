@@ -119,6 +119,7 @@ jobs:
         run: |
           mkdir -p work
           gh run download "${{ inputs.plan_run }}" -R "$GITHUB_REPOSITORY" -n plan -D plan_in
+          gh run download "${{ inputs.plan_run }}" -R "$GITHUB_REPOSITORY" -n stock -D plan_in/stock || mkdir -p plan_in/stock
           cp -r plan_in/* work/
           ls -la work
           if [ -n "$PLAN_B64" ]; then
@@ -131,9 +132,15 @@ jobs:
           path: |
             work/analysis.json
             work/plan.json
-            work/stock
           retention-days: 2
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stock
+          path: work/stock
+          retention-days: 2
+          compression-level: 0
+          if-no-files-found: ignore
       - name: Parts
         id: parts
         if: ${{ inputs.plan_only != 'true' }}

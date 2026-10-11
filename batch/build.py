@@ -142,9 +142,9 @@ def main():
 <div id="root" data-composition-id="main" data-start="0" data-duration="{dur}" data-width="1080" data-height="1920">
   <div id="snap"><div id="cam"><video id="v" src="media/clip.mp4" muted playsinline data-start="0" data-duration="{dur}" data-track-index="1"></video></div>
     <div id="stocks" class="layer">{stockvids}</div></div>
+  <div id="blk2"></div>
   <div id="over" class="layer">{lb}</div>
   <div id="blk"></div>
-  <div id="blk2"></div>
 </div>
 <script>window.PLAN = {json.dumps(pagePlan, ensure_ascii=False)};</script>
 <script>
