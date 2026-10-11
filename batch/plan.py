@@ -51,6 +51,7 @@ def build_prompt(an, pr, ctx):
     wc = "\n".join(f"  - {k}: {v}" for k, v in WILDCARDS.items())
     sfx = ", ".join(f"{k} ({v})" for k, v in SFX_VOCAB.items())
     recent = ctx.get('recent_wildcards') or []
+    allowed = ctx.get('allowed_wildcards') or list(WILDCARDS)
     cuts = ", ".join(f"{c:.1f}" for c in an['cuts']) or "none"
     return f"""Ты — смелый монтажёр вертикальных видео (Reels). Клип: говорящая голова в реальной комнате, {an['dur']:.0f} с. Пресет «{pr['name']}» ({pr['base_look']}).
 Ниже транскрипт по предложениям, формат `idx:слово` ([№ @сек]). Реальные склейки в исходнике на секундах: {cuts}.
@@ -67,7 +68,7 @@ def build_prompt(an, pr, ctx):
  Каждая идея обязана опираться на один из типов wildcard (меню ниже) с конкретными параметрами. Для каждой отметь проверку по правилам 1-3 (true/false) и смелость 1-5.
  Выбери СИЛЬНЕЙШУЮ идею, прошедшую все проверки, и построй её как wildcard клипа (один на клип).{(' Недавно в этой пачке уже были wildcard: ' + ', '.join(recent) + ' — выбери другой тип, если идея не сильнее.') if recent else ''}
 
-Меню wildcard:
+Меню wildcard (для ЭТОГО клипа разрешены ТОЛЬКО типы: {', '.join(allowed)} — так в пачке из 20 клипов фишки не повторяются; все 5 идей должны быть из этого списка):
 {wc}
 Звуки для sound_gag (sample): {sfx}
 
@@ -88,7 +89,8 @@ def build_prompt(an, pr, ctx):
 Верни ТОЛЬКО JSON по схеме."""
 
 
-def schema(pr):
+def schema(pr, allowed=None):
+    allowed = allowed or list(WILDCARDS)
     ins = {"type": "object", "required": ["kind", "first", "last"], "properties": {
         "kind": {"enum": pr['kinds']}, "first": {"type": "integer", "minimum": 0}, "last": {"type": "integer", "minimum": 0},
         "text": {"type": "string", "maxLength": 20}, "value": {"type": "number"}, "prefix": {"type": "string", "maxLength": 4},
@@ -97,13 +99,13 @@ def schema(pr):
         "items": {"type": "array", "items": {"type": "string", "maxLength": 26}, "maxItems": 3}}}
     return {"type": "object", "required": ["ideas", "picked", "wildcard", "hook", "keys", "inserts"], "properties": {
         "ideas": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"type": "object", "required": ["id", "idea", "type", "rules_ok", "boldness"], "properties": {
-            "id": {"type": "integer"}, "idea": {"type": "string", "maxLength": 260}, "type": {"enum": list(WILDCARDS)},
+            "id": {"type": "integer"}, "idea": {"type": "string", "maxLength": 260}, "type": {"enum": allowed},
             "rules_ok": {"type": "object", "properties": {"real_room_only": {"type": "boolean"}, "adult_masculine": {"type": "boolean"},
                                                           "audible_levels": {"type": "boolean"}}},
             "boldness": {"type": "integer", "minimum": 1, "maximum": 5}}}},
         "picked": {"type": "integer"},
         "wildcard": {"type": "object", "required": ["type", "at_word"], "properties": {
-            "type": {"enum": list(WILDCARDS)}, "at_word": {"type": "integer", "minimum": 0}, "last_word": {"type": "integer", "minimum": 0},
+            "type": {"enum": allowed}, "at_word": {"type": "integer", "minimum": 0}, "last_word": {"type": "integer", "minimum": 0},
             "text": {"type": "string", "maxLength": 20}, "query": {"type": "string", "maxLength": 50}, "sample": {"type": "string"},
             "note": {"type": "string", "maxLength": 200}}},
         "hook": {"type": "object", "required": ["lines", "first", "last"], "properties": {
@@ -300,15 +302,20 @@ def main():
     ap.add_argument('--timeout', type=int, default=int(os.environ.get('PLAN_TIMEOUT_SEC') or 420))
     ap.add_argument('--seed', default='0')
     ap.add_argument('--no-claude', action='store_true')
+    ap.add_argument('--clip-no', type=int, default=0)
     a = ap.parse_args()
     an = json.loads(Path(a.analysis).read_text(encoding='utf-8'))
     pr = PRESETS[a.preset]
     ctx = json.loads(Path(a.payload).read_text(encoding='utf-8')) if a.payload and Path(a.payload).exists() else {}
     seed = a.seed
+    if a.clip_no:                                      # rotating window of 5 of the 9 wildcard types: neighbours in the batch never compete for the same type
+        names = list(WILDCARDS)
+        k = (a.clip_no * 2) % len(names)
+        ctx['allowed_wildcards'] = [names[(k + i) % len(names)] for i in range(5)]
     raw, info, planner = None, {}, 'claude'
     if not a.no_claude and an['words']:
         prompt = build_prompt(an, pr, ctx)
-        sch = schema(pr)
+        sch = schema(pr, ctx.get('allowed_wildcards'))
         for attempt in (1, 2):
             try:
                 raw, info = call_claude(prompt, sch, a.model, a.timeout)

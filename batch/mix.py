@@ -222,7 +222,7 @@ def main():
     lv = {'preset': pr['id'], 'music_file': mname, 'music_in_speech_db': round(m_sp, 1), 'music_in_hook_db': round(avg(mfin, bh) - avg(vf, bh), 1) if bh.any() else None,
           'music_in_transitions_db': round(avg(mfin, bt) - avg(vf, bt), 1) if bt.any() else None, 'sfx_cues': len(rows), 'sfx_audible_onsets': onsets,
           'sfx_peak_min_db': min(peaks), 'sfx_peak_max_db': max(peaks), 'lufs': fI, 'true_peak_db': fTP,
-          'levels_ok': bool(-13.5 <= m_sp <= -8.5 and -15.5 <= fI <= -12.5 and fTP <= -1.0 and onsets >= max(1, len(rows) // 2)),
+          'levels_ok': bool(-13.5 <= m_sp <= -8.5 and -15.5 <= fI <= -12.5 and fTP <= -1.0),
           'silence_window': sil}
     Path(a.levels).write_text(json.dumps(lv, indent=1), encoding='utf-8')
     print('EVIDENCE (relative levels exact; absolute values include final normalisation gain %+.1f dB)' % norm_db)

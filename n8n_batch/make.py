@@ -127,7 +127,7 @@ def dispatcher():
             "method": "POST", "url": f"{GH}/actions/workflows/batch-edit.yml/dispatches", "authentication": "predefinedCredentialType", "nodeCredentialType": "githubApi",
             "sendHeaders": True, "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github+json"}]},
             "sendBody": True, "specifyBody": "json",
-            "jsonBody": "={{ JSON.stringify({ ref: 'batch-engine', inputs: { job_id: $json.id, video_url: $json.video_url, preset: $json.preset, seed: String($json.seed), recent: ($json.recent_wildcards || []).join(',') } }) }}",
+            "jsonBody": "={{ JSON.stringify({ ref: 'batch-engine', inputs: { job_id: $json.id, video_url: $json.video_url, preset: $json.preset, clip_no: String($json.clip_no), seed: String($json.seed), recent: ($json.recent_wildcards || []).join(',') } }) }}",
             "options": {"response": {"response": {"fullResponse": True, "neverError": True}}}}, [660, 0], cred="gh"),
         if_bool("Dispatch ok?", "={{ $json.statusCode < 300 }}", [880, 0]),
         qpost("Dispatch failed", "/finish", "={{ JSON.stringify({ job_id: $('Split jobs').item.json.id, ok: false, error: 'dispatch http ' + $json.statusCode }) }}", [1100, 120]),
@@ -154,12 +154,12 @@ return [{ json: { job, state: ok ? 'success' : 'failed', run_id: r.id, run_url: 
 const f = $('Match run').first().json;
 const job = f.job;
 const item = $input.first();
-const by = {};
-for (const b of Object.values(item.binary || {})) by[b.fileName] = b;
+const by = {}, key = {};
+for (const [k, b] of Object.entries(item.binary || {})) { by[b.fileName] = b; key[b.fileName] = k; }
 const video = by['final.mp4'];
 if (!video) throw new Error('final.mp4 not found: ' + Object.keys(by).join(','));
 let res = {};
-try { res = JSON.parse(Buffer.from(by['result.json'].data, 'base64').toString('utf8')); } catch (e) {}
+try { res = JSON.parse((await this.helpers.getBinaryDataBuffer(0, key['result.json'])).toString('utf8')); } catch (e) {}
 const NAMES = { dark: 'Dark Steel', proof: 'Proof Cards', slab: 'Hazard Slab' };
 const num = String(job.clip_no).padStart(2, '0');
 const cap = `Клип ${num} из ${job.total} · ${NAMES[res.preset || job.preset] || job.preset}` + (res.wildcard ? ` · фишка: ${res.wildcard}` : '');

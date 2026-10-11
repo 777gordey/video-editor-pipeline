@@ -15,6 +15,10 @@ on:
       preset:
         description: "dark | proof | slab"
         required: true
+      clip_no:
+        description: "arrival number in the batch (rotates the wildcard types)"
+        required: false
+        default: "0"
       seed:
         description: "variety seed"
         required: false
@@ -86,7 +90,7 @@ jobs:
           PLAN_MODEL: ${{ inputs.model || vars.PLAN_MODEL }}
         run: |
           python3 -c "import json,sys;json.dump({'recent_wildcards':[x for x in sys.argv[1].split(',') if x]},open('work/payload.json','w'))" "${{ inputs.recent }}"
-          python batch/plan.py work/analysis.json --preset "${{ inputs.preset }}" --out work/plan.json --payload work/payload.json --seed "${{ inputs.seed }}"
+          python batch/plan.py work/analysis.json --preset "${{ inputs.preset }}" --out work/plan.json --payload work/payload.json --seed "${{ inputs.seed }}" --clip-no "${{ inputs.clip_no }}"
           python batch/stock.py --plan work/plan.json --out work/stock
       - name: Parts
         id: parts

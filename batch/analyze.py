@@ -69,7 +69,7 @@ tick('whisper', t)
 
 # ---------------- real cuts of the footage
 t = time.time()
-r = sh(['ffmpeg', '-hide_banner', '-i', a.src, '-an', '-vf', "scale=320:-2,select='gt(scene,0.38)',showinfo", '-f', 'null', '-'])
+r = sh(['ffmpeg', '-hide_banner', '-i', a.src, '-an', '-vf', "scale=320:-2,select='gt(scene,0.22)',showinfo", '-f', 'null', '-'])
 cuts = []
 for m in re.finditer(r'pts_time:([\d.]+)', r.stderr):
     c = float(m.group(1))
