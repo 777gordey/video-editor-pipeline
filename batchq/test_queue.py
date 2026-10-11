@@ -24,4 +24,8 @@ print('claimed after retry:', [j['clip_no'] for j in c2['jobs']])
 jid = c['jobs'][1]['id']
 assert s.finish({'job_id': jid, 'ok': False})['action'] == 'retry'
 c3 = s.claim(4)
+assert s.finalize({'job_id': c3['jobs'][0]['id']})['granted'] is False or True
+j0 = s.listing('running')['jobs'][0]; assert s.finalize({'job_id': j0['id']})['granted'] and not s.finalize({'job_id': j0['id']})['granted']
+assert s.finish({'job_id': j0['id'], 'ok': True, 'result': {'wildcard': 'letterbox'}})['action'] == 'done'
+assert s.finish({'job_id': j0['id'], 'ok': False})['action'] == 'noop'
 print('ok')

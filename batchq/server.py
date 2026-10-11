@@ -85,9 +85,9 @@ def claim(limit):
     now = time.time()
     c = db()
     try:
-        for r in c.execute("SELECT * FROM jobs WHERE status='running' AND started<?", (now - RUN_TIMEOUT,)).fetchall():
+        for r in c.execute("SELECT * FROM jobs WHERE status IN ('running','finalizing') AND started<?", (now - RUN_TIMEOUT,)).fetchall():
             _finish(c, r['id'], False, 'run timeout (watchdog)', None, None)
-        running = c.execute("SELECT COUNT(*) n FROM jobs WHERE status='running'").fetchone()['n']
+        running = c.execute("SELECT COUNT(*) n FROM jobs WHERE status IN ('running','finalizing')").fetchone()['n']
         out = []
         while running + len(out) < limit:
             r = c.execute("SELECT * FROM jobs WHERE status='queued' ORDER BY created, clip_no LIMIT 1").fetchone()
@@ -108,6 +108,8 @@ def _finish(c, jid, ok, error, result, run_url):
     r = c.execute('SELECT * FROM jobs WHERE id=?', (jid,)).fetchone()
     if not r:
         return {'action': 'unknown'}
+    if r['status'] not in ('running', 'finalizing'):
+        return {'action': 'noop', 'job': row(r)}
     now = time.time()
     if ok:
         wc = (result or {}).get('wildcard') if isinstance(result, dict) else None
@@ -129,6 +131,16 @@ def finish(b):
         c.close()
 
 
+def finalize(b):
+    """first caller wins: only one n8n execution may deliver / fail a finished run"""
+    c = db()
+    try:
+        cur = c.execute("UPDATE jobs SET status='finalizing' WHERE id=? AND status='running'", (b['job_id'],))
+        return {'granted': cur.rowcount == 1}
+    finally:
+        c.close()
+
+
 def update(b):
     c = db()
     try:
@@ -145,6 +157,7 @@ def listing(status=None):
         rows = [row(r) for r in c.execute(q, (status,) if status else ())]
         for r in rows:
             r.pop('result', None)
+            r['total'] = total_of(c, r['batch_id'])
         return {'jobs': rows}
     finally:
         c.close()
@@ -213,6 +226,8 @@ class H(BaseHTTPRequestHandler):
                     return self._send(200, claim(int(b.get('limit', 4))))
                 if self.path == '/finish':
                     return self._send(200, finish(b))
+                if self.path == '/finalize':
+                    return self._send(200, finalize(b))
                 if self.path == '/update':
                     return self._send(200, update(b))
                 if self.path == '/purge':
