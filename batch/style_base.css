@@ -1,0 +1,45 @@
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+#root{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:#000;color:var(--bone)}
+#snap{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:50% 0%;will-change:transform}
+#cam{position:absolute;left:0;top:0;width:1080px;height:1920px;transform-origin:0 0}
+#cam video{position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover}
+.layer{position:absolute;left:0;top:0;width:1080px;height:1920px;pointer-events:none}
+.sbox{position:absolute;left:0;top:0;width:1080px;height:1920px;overflow:hidden;background:#000;opacity:0;visibility:hidden;transform-origin:50% 40%}
+.sbox video{position:absolute;left:0;top:0;width:1080px;height:1920px;object-fit:cover}
+
+.hk{position:absolute;white-space:nowrap;text-align:center;line-height:1;opacity:0;visibility:hidden}
+.cap{position:absolute;left:0;width:1080px;text-align:center;white-space:nowrap;line-height:1.15;opacity:0;visibility:hidden}
+.cap .w{display:inline-block;transform-origin:50% 60%;vertical-align:middle}
+
+.rule{position:absolute;height:5px;background:var(--acc);opacity:0;visibility:hidden}
+.wbar{position:absolute;width:5px;background:var(--acc);opacity:0;visibility:hidden}
+#flash{position:absolute;left:0;top:0;width:1080px;height:1920px;background:var(--bone);opacity:0;pointer-events:none}
+#blk{position:absolute;left:0;top:0;width:1080px;height:1920px;background:#000;opacity:0;pointer-events:none}
+.lb{position:absolute;left:0;width:1080px;height:150px;background:#000}
+#lb1{top:0}#lb2{bottom:0}
+
+/* cards (band decides the vertical slot) */
+.uc{position:absolute;left:70px;width:940px;height:214px;border-radius:var(--rad);background:var(--card);border:2px solid var(--cardline);
+  box-shadow:0 22px 44px rgba(0,0,0,.5);opacity:0;visibility:hidden;overflow:hidden}
+body.band-top .uc{top:44px}
+body.band-low .uc{top:1223px}
+.uc .lab{position:absolute;left:40px;top:22px;font-family:var(--fmono);font-weight:800;font-size:25px;letter-spacing:.09em;color:var(--mut);text-transform:uppercase}
+.s-row{position:absolute;left:40px;top:58px;white-space:nowrap;font-family:var(--fnum);font-weight:800;color:var(--acc);font-size:118px;line-height:1.1}
+.s-row .pre,.s-row .suf{font-size:56px;color:var(--mut);margin:0 .2em}
+.s-bar{position:absolute;left:40px;bottom:22px;height:10px;border-radius:5px;background:var(--acc);width:0}
+.row{position:absolute;left:28px;width:884px;height:72px;border-radius:calc(var(--rad) - 12px);display:flex;align-items:center;gap:20px;padding:0 24px;font-weight:800;font-size:40px;white-space:nowrap;font-family:var(--fbase)}
+.row.r1{top:52px;background:var(--row);color:var(--mut)}
+.row.r2{top:132px;background:var(--acc);color:var(--onacc)}
+.row svg{width:44px;height:44px;flex:none}
+.strike{position:absolute;left:84px;top:34px;height:5px;background:var(--bad);width:0;border-radius:3px}
+.li{position:absolute;left:28px;width:884px;height:48px;display:flex;align-items:center;gap:18px;font-weight:800;font-size:34px;font-family:var(--fbase);white-space:nowrap}
+.li svg{width:38px;height:38px;flex:none}
+.av{position:absolute;left:30px;top:32px;width:150px;height:150px;border-radius:50%;background:var(--acc);color:var(--onacc);font-family:var(--fnum);font-weight:900;font-size:68px;display:flex;align-items:center;justify-content:center}
+.n-t1{position:absolute;left:212px;top:48px;font-size:46px;font-weight:800;white-space:nowrap;font-family:var(--fbase)}
+.n-t2{position:absolute;left:212px;top:118px;font-family:var(--fmono);font-weight:800;font-size:30px;color:var(--mut);white-space:nowrap}
+
+/* slams */
+.punch{position:absolute;left:0;width:1080px;text-align:center;line-height:1;opacity:0;visibility:hidden;white-space:nowrap}
+.stamp{position:absolute;left:540px;white-space:nowrap;line-height:1;opacity:0;visibility:hidden}
+.echo{position:absolute;left:540px;white-space:nowrap;line-height:1;opacity:0;visibility:hidden;color:transparent;-webkit-text-stroke:3px var(--acc);font-family:var(--fnum);font-weight:900}

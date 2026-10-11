@@ -1,0 +1,6 @@
+faster-whisper==1.1.1
+opencv-python-headless<5
+numpy<2.3
+jsonschema
+fonttools
+brotli
