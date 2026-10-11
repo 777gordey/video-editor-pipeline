@@ -219,8 +219,19 @@ def normalise(raw, an, pr, seed):
         return all(any(s.startswith(t[:4]) or t.startswith(s[:4]) for s in support if s) for t in toks)
     if not hook_lines or not all(hook_grounded(x) for x in hook_lines):
         notes.append('hook not grounded in the speech -> verbatim fallback')
-        first = [i for i in range(n) if _tok(W[i]['w']) not in ('э', 'эм', 'ну')][:9]
-        chunks = [first[0:3], first[3:6], first[6:9]]
+        # verbatim: the planner's own support span if valid, else the first sentence; cut at a sentence end / before a dangling preposition
+        a0 = hf if _ok(hf, n) and start(hf) < 14 else 0
+        idxs = [i for i in range(a0, min(n, a0 + 14)) if _tok(W[i]['w']) not in ('э', 'эм', 'ну')]
+        cut = len(idxs)
+        for k, i in enumerate(idxs):
+            if W[i]['w'][-1:] in '.?!' and k >= 2:
+                cut = k + 1
+                break
+        idxs = idxs[:min(cut, 9)]
+        while len(idxs) > 3 and _tok(W[idxs[-1]]['w']) in STOP:
+            idxs.pop()
+        sz = max(2, (len(idxs) + 2) // 3)
+        chunks = [idxs[k:k + sz] for k in range(0, len(idxs), sz)][:3]
         hook_lines = [" ".join(W[i]['w'].strip(',.!?…') for i in c) for c in chunks if c]
     hook_lines = [x.strip(' ,.-—') for x in hook_lines][:3]
 
